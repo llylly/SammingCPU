@@ -100,6 +100,17 @@ module samming_cpu(
 	wire[`RegBus] hi;
 	wire[`RegBus] lo;
 	
+	// pipeline stall related
+	wire[5:0] stall;
+	wire stallreq_from_id;
+	wire stallreq_from_ex;
+	
+	// buffer signals for MADD/MSUB
+	wire[`DoubleRegBus] hilo_tmp_o;
+	wire[1:0] cnt_o;
+	wire[`DoubleRegBus] hilo_tmp_i;
+	wire[1:0] cnt_i;
+	
 	/**** testing ****/
 	assign test_signal = wb_wdata_i;
 	
@@ -108,12 +119,12 @@ module samming_cpu(
 	
 	/* pc_reg instantiate */
 	pc_reg pc_reg0(
-		.clk(clk), .rst(rst), .pc(pc), .ce(rom_ce_o)
+		.clk(clk), .rst(rst), .stall(stall), .pc(pc), .ce(rom_ce_o)
 	);
 	
 	/* IF-ID instantiate */
 	if_id if_id0(
-		.clk(clk), .rst(rst),
+		.clk(clk), .rst(rst), .stall(stall),
 		.if_pc(pc), .if_inst(rom_data_i),
 		.id_pc(id_pc_i), .id_inst(id_inst_i)
 	);
@@ -131,7 +142,9 @@ module samming_cpu(
 		.reg1_addr_o(reg1_addr), .reg2_addr_o(reg2_addr),
 		.aluop_o(id_aluop_o), .alusel_o(id_alusel_o),
 		.reg1_o(id_reg1_o), .reg2_o(id_reg2_o),
-		.wd_o(id_wd_o), .wreg_o(id_wreg_o)
+		.wd_o(id_wd_o), .wreg_o(id_wreg_o),
+		
+		.stallreq(stallreq_from_id)
 	);
 	
 	/* regfile instantiate */
@@ -144,7 +157,7 @@ module samming_cpu(
 	
 	/* ID-EX instantiate */
 	id_ex id_ex0(
-		.clk(clk), .rst(rst),
+		.clk(clk), .rst(rst), .stall(stall),
 		.id_aluop(id_aluop_o), .id_alusel(id_alusel_o),
 		.id_reg1(id_reg1_o), .id_reg2(id_reg2_o),
 		.id_wd(id_wd_o), .id_wreg(id_wreg_o),
@@ -164,16 +177,21 @@ module samming_cpu(
 		.wb_whilo_i(wb_whilo_i), .wb_hi_i(wb_hi_i), .wb_lo_i(wb_lo_i), 
 		.wd_o(ex_wd_o), .wreg_o(ex_wreg_o),
 		.wdata_o(ex_wdata_o),
-		.whilo_o(ex_whilo_o), .hi_o(ex_hi_o), .lo_o(ex_lo_o)
+		.whilo_o(ex_whilo_o), .hi_o(ex_hi_o), .lo_o(ex_lo_o),
+		.cnt_i(cnt_i), .hilo_tmp_i(hilo_tmp_i),
+		.cnt_o(cnt_o), .hilo_tmp_o(hilo_tmp_o),
+		.stallreq(stallreq_from_ex)
 	);
 	
 	/* EX-MEM instantiate */
 	ex_mem ex_mem0(
-		.clk(clk), .rst(rst),
+		.clk(clk), .rst(rst), .stall(stall),
 		.ex_wd(ex_wd_o), .ex_wreg(ex_wreg_o), .ex_wdata(ex_wdata_o),
 		.ex_whilo(ex_whilo_o), .ex_hi(ex_hi_o), .ex_lo(ex_lo_o),
 		.mem_wd(mem_wd_i), .mem_wreg(mem_wreg_i), .mem_wdata(mem_wdata_i),
-		.mem_whilo(mem_whilo_i), .mem_hi(mem_hi_i), .mem_lo(mem_lo_i)
+		.mem_whilo(mem_whilo_i), .mem_hi(mem_hi_i), .mem_lo(mem_lo_i),
+		.cnt_i(cnt_o), .hilo_tmp_i(hilo_tmp_o),
+		.cnt_o(cnt_i), .hilo_tmp_o(hilo_tmp_i)
 	);
 	
 	/* MEM instantiate */
@@ -187,7 +205,7 @@ module samming_cpu(
 	
 	/* MEM-WB instantiate */
 	mem_wb mem_wb0(
-		.clk(clk), .rst(rst),
+		.clk(clk), .rst(rst), .stall(stall),
 		.mem_wd(mem_wd_o), .mem_wreg(mem_wreg_o), .mem_wdata(mem_wdata_o),
 		.mem_whilo(mem_whilo_o), .mem_hi(mem_hi_o), .mem_lo(mem_lo_o),
 		.wb_wd(wb_wd_i), .wb_wreg(wb_wreg_i), .wb_wdata(wb_wdata_i),
@@ -199,6 +217,13 @@ module samming_cpu(
 		.clk(clk), .rst(rst),
 		.we(wb_whilo_i), .hi_i(wb_hi_i), .lo_i(wb_lo_i),
 		.hi_o(hi), .lo_o(lo)
+	);
+	
+	/* pipeline stall controller */
+	ctrl ctrl0(
+		.rst(rst), 
+		.stallreq_from_id(stallreq_from_id), .stallreq_from_ex(stallreq_from_ex),
+		.stall(stall)
 	);
 
 endmodule

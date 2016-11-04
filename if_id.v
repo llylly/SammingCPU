@@ -15,6 +15,7 @@
 module if_id(
 	input wire					clk,
 	input wire					rst,
+	input wire[5:0]				stall,
 	
 	// signals from IF
 	input wire[`InstAddrBus]	if_pc,
@@ -33,6 +34,13 @@ module if_id(
 			id_pc <= `ZeroWord;
 			id_inst <= `ZeroWord;
 		end else
+		if (stall[1] == `Stop && stall[2] == `NoStop) 
+		begin
+			// NOP added
+			id_pc <= `ZeroWord;
+			id_inst <= `ZeroWord;
+		end else
+		if (stall[1] == `NoStop)
 		begin
 			// Otherwise directly send
 			id_pc <= if_pc;

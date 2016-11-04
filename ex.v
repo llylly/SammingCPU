@@ -50,7 +50,17 @@ module ex(
 	// HI/LO output wires
 	output reg					whilo_o,
 	output reg[`RegBus]			hi_o,
-	output reg[`RegBus]			lo_o
+	output reg[`RegBus]			lo_o,
+	
+	// port for multi and add/sub operations signal buffer
+	input wire[`DoubleRegBus]	hilo_tmp_i,
+	input wire[1:0]				cnt_i,
+	
+	output reg[`DoubleRegBus]	hilo_tmp_o,
+	output reg[1:0]				cnt_o,
+		
+	// control signal for pipeline stall
+	output reg					stallreq
 	
 );
 
@@ -87,6 +97,8 @@ module ex(
 		// tmp storage of multi result
 	reg[`DoubleRegBus] hilo_tmp1;
 		// tmp storage of multi-add/sub result
+	reg stallreq_for_madd_msub;
+		// pipeline stall signal for madd and msub inst
 		
 	/* calculate results of some variables */
 	assign reg2_i_mux = ((aluop_i == `EXE_SUB_OP) || 
@@ -240,10 +252,12 @@ module ex(
 	end
 	
 	/* multiplicaiton operation */
-	assign opdata1_mult = (((aluop_i == `EXE_MUL_OP) || (aluop_i == `EXE_MULT_OP)) && 
+	assign opdata1_mult = (((aluop_i == `EXE_MUL_OP) || (aluop_i == `EXE_MULT_OP) ||
+							(aluop_i == `EXE_MADD_OP) || (aluop_i == `EXE_MSUB_OP)) && 
 							(reg1_i[31] == 1'b1)) ?
 							(~reg1_i + 1) : reg1_i; // signed : unsigned
-	assign opdata2_mult = (((aluop_i == `EXE_MUL_OP) || (aluop_i == `EXE_MULT_OP)) &&
+	assign opdata2_mult = (((aluop_i == `EXE_MUL_OP) || (aluop_i == `EXE_MULT_OP) ||
+							(aluop_i == `EXE_MADD_OP) || (aluop_i == `EXE_MSUB_OP)) &&
 							(reg2_i[31] == 1'b1)) ?
 							(~reg2_i + 1) : reg2_i; // signed : unsigned
 	assign hilo_tmp = opdata1_mult * opdata2_mult;
@@ -254,7 +268,8 @@ module ex(
 		begin
 			mulRes <= {`ZeroWord, `ZeroWord};
 		end else
-		if ((aluop_i == `EXE_MULT_OP) || (aluop_i == `EXE_MUL_OP))
+		if ((aluop_i == `EXE_MULT_OP) || (aluop_i == `EXE_MUL_OP) ||
+			(aluop_i == `EXE_MADD_OP) || (aluop_i == `EXE_MSUB_OP))
 		begin
 			// signed multiplication
 			if (reg1_i[31] ^ reg2_i[31] == 1'b1) 
@@ -328,7 +343,63 @@ module ex(
 		end
 	end
 	
-	/* handling MTHI and MTLO */
+	/* MADD and MSUB operation */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			hilo_tmp_o <= {`ZeroWord, `ZeroWord};
+			cnt_o <= 2'b00;
+			stallreq_for_madd_msub <= `NoStop;
+		end else
+		begin
+			case (aluop_i)
+				`EXE_MADD_OP, `EXE_MADDU_OP: begin
+					if (cnt_i == 2'b00) 
+					begin
+						// state 0
+						hilo_tmp_o <= mulRes; // add
+						cnt_o <= 2'b01;
+						hilo_tmp1 <= {`ZeroWord, `ZeroWord};
+						stallreq_for_madd_msub <= `Stop;
+					end else
+					if (cnt_i == 2'b01)
+					begin
+						// state 1
+						hilo_tmp_o <= {`ZeroWord, `ZeroWord};
+						cnt_o <= 2'b10;
+						hilo_tmp1 <= hilo_tmp_i + {HI, LO};
+						stallreq_for_madd_msub <= `NoStop;
+					end
+				end
+				`EXE_MSUB_OP, `EXE_MSUBU_OP: begin
+					if (cnt_i == 2'b00)
+					begin
+						// state 0
+						hilo_tmp_o <= ~mulRes + 1; // minus
+						cnt_o <= 2'b01;
+						hilo_tmp1 <= {`ZeroWord, `ZeroWord};
+						stallreq_for_madd_msub <= `Stop;
+					end else
+					if (cnt_i == 2'b01)
+					begin
+						// state 1
+						hilo_tmp_o <= {`ZeroWord, `ZeroWord};
+						cnt_o <= 2'b10;
+						hilo_tmp1 <= hilo_tmp_i + {HI, LO};
+						stallreq_for_madd_msub <= `NoStop;
+					end
+				end
+				default: begin
+					hilo_tmp_o <= {`ZeroWord, `ZeroWord};
+					cnt_o <= 2'b00;
+					stallreq_for_madd_msub <= `NoStop;
+				end
+			endcase
+		end
+	end
+	
+	/* handling HI and LO result */
 	always @(*)
 	begin
 		if (rst == `RstEnable)
@@ -336,6 +407,16 @@ module ex(
 			whilo_o <= `WriteDisable;
 			hi_o <= `ZeroWord;
 			lo_o <= `ZeroWord;
+		end else
+		if ((aluop_i == `EXE_MADD_OP) || (aluop_i == `EXE_MADDU_OP)) begin
+			whilo_o <= `WriteEnable;
+			hi_o <= hilo_tmp1[63:32];
+			lo_o <= hilo_tmp1[31:0];
+		end else
+		if ((aluop_i == `EXE_MSUB_OP) || (aluop_i == `EXE_MSUBU_OP)) begin
+			whilo_o <= `WriteEnable;
+			hi_o <= hilo_tmp1[63:32];
+			lo_o <= hilo_tmp1[31:0];
 		end else
 		if ((aluop_i == `EXE_MULT_OP) || (aluop_i == `EXE_MULTU_OP)) begin
 			whilo_o <= `WriteEnable;
@@ -359,6 +440,12 @@ module ex(
 			hi_o <= `ZeroWord;
 			lo_o <= `ZeroWord;
 		end
+	end
+	
+	/* pipeline stall signal */
+	always @(*)
+	begin
+		stallreq <= stallreq_for_madd_msub;
 	end
 
 endmodule

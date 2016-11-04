@@ -16,6 +16,7 @@
 module id_ex(
 	input wire					clk,
 	input wire					rst,
+	input wire[5:0]				stall,
 	
 	// read signals from ID
 	input wire[`ALUOpBus]		id_aluop,
@@ -46,6 +47,17 @@ module id_ex(
 			ex_wd <= `NOPRegAddr;
 			ex_wreg <= `WriteDisable;
 		end else
+		if (stall[2] == `Stop && stall[3] == `NoStop)
+		begin
+			// NOP added
+			ex_aluop <= `EXE_NOP_OP;
+			ex_alusel <= `EXE_RES_NOP;
+			ex_reg1 <= `ZeroWord;
+			ex_reg2 <= `ZeroWord;
+			ex_wd <= `NOPRegAddr;
+			ex_wreg <= `WriteDisable;
+		end else
+		if (stall[2] == `NoStop)
 		begin
 			// simply sent to EX at rising edge of clk
 			ex_aluop <= id_aluop;

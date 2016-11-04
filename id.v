@@ -55,8 +55,11 @@ module id(
 		// operand 2
 	output reg[`RegAddrBus]		wd_o,
 		// to write register no
-	output reg					wreg_o
+	output reg					wreg_o,
 		// whether write op is required for current instruction
+		
+	// control signal for pipeline stall
+	output wire					stallreq
 
 );
 
@@ -344,6 +347,38 @@ module id(
 									reg2_read_o <= 1'b1;
 									instValid <= `InstValid;
 								end
+								`EXE_MADD: begin
+									wreg_o <= `WriteDisable;
+									aluop_o <= `EXE_MADD_OP;
+									alusel_o <= `EXE_RES_NOP;
+									reg1_read_o <= 1'b1;
+									reg2_read_o <= 1'b1;
+									instValid <= `InstValid;
+								end
+								`EXE_MADDU: begin
+									wreg_o <= `WriteDisable;
+									aluop_o <= `EXE_MADDU_OP;
+									alusel_o <= `EXE_RES_NOP;
+									reg1_read_o <= 1'b1;
+									reg2_read_o <= 1'b1;
+									instValid <= `InstValid;
+								end
+								`EXE_MSUB: begin
+									wreg_o <= `WriteDisable;
+									aluop_o <= `EXE_MSUB_OP;
+									alusel_o <= `EXE_RES_NOP;
+									reg1_read_o <= 1'b1;
+									reg2_read_o <= 1'b1;
+									instValid <= `InstValid;
+								end
+								`EXE_MSUBU: begin
+									wreg_o <= `WriteDisable;
+									aluop_o <= `EXE_MSUBU_OP;
+									alusel_o <= `EXE_RES_NOP;
+									reg1_read_o <= 1'b1;
+									reg2_read_o <= 1'b1;
+									instValid <= `InstValid;
+								end
 								default: begin
 								end
 							endcase
@@ -554,5 +589,8 @@ module id(
 			reg2_o <= `ZeroWord;
 		end
 	end
+	
+	/* pipeline stall signal */
+	assign stallreq = `NoStop;
 
 endmodule
