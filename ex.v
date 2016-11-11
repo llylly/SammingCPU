@@ -58,6 +58,16 @@ module ex(
 	
 	output reg[`DoubleRegBus]	hilo_tmp_o,
 	output reg[1:0]				cnt_o,
+	
+	// input of DIV module
+	input wire[`DoubleRegBus]	div_result_i,
+	input wire					div_ready_i,
+	
+	// output of DIV module
+	output reg[`RegBus]			div_opdata1_o,
+	output reg[`RegBus]			div_opdata2_o,
+	output reg					div_start_o,
+	output reg					signed_div_o,
 		
 	// control signal for pipeline stall
 	output reg					stallreq
@@ -99,6 +109,8 @@ module ex(
 		// tmp storage of multi-add/sub result
 	reg stallreq_for_madd_msub;
 		// pipeline stall signal for madd and msub inst
+	reg stallreq_for_div;
+		// pipeline stall signal for div inst
 		
 	/* calculate results of some variables */
 	assign reg2_i_mux = ((aluop_i == `EXE_SUB_OP) || 
@@ -399,6 +411,78 @@ module ex(
 		end
 	end
 	
+	/* DIV and DIVU operation */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			stallreq_for_div <= `NoStop;
+			div_opdata1_o <= `ZeroWord;
+			div_opdata2_o <= `ZeroWord;
+			div_start_o <= `DivStop;
+			signed_div_o <= 1'b0;
+		end else
+		begin
+			stallreq_for_div <= `NoStop;
+			div_opdata1_o <= `ZeroWord;
+			div_opdata2_o <= `ZeroWord;
+			div_start_o <= `DivStop;
+			signed_div_o <= 1'b0;
+			case (aluop_i)
+				`EXE_DIV_OP: begin
+					if (div_ready_i == `DivResultNotReady)
+					begin
+						div_opdata1_o <= reg1_i;
+						div_opdata2_o <= reg2_i;
+						div_start_o <= `DivStart;
+						signed_div_o <= 1'b1;
+						stallreq_for_div <= `Stop;
+					end else
+					if (div_ready_i == `DivResultReady)
+					begin
+						div_opdata1_o <= reg1_i;
+						div_opdata2_o <= reg2_i;
+						div_start_o <= `DivStop;
+						signed_div_o <= 1'b1;
+						stallreq_for_div <= `NoStop;
+					end else
+					begin
+						div_opdata1_o <= `ZeroWord;
+						div_opdata2_o <= `ZeroWord;
+						div_start_o <= `DivStop;
+						signed_div_o <= 1'b0;
+						stallreq_for_div <= `NoStop;
+					end
+				end
+				`EXE_DIVU_OP: begin
+					if (div_ready_i == `DivResultNotReady)
+					begin
+						div_opdata1_o <= reg1_i;
+						div_opdata2_o <= reg2_i;
+						div_start_o <= `DivStart;
+						signed_div_o <= 1'b0;
+						stallreq_for_div <= `Stop;
+					end else
+					if (div_ready_i == `DivResultReady)
+					begin
+						div_opdata1_o <= reg1_i;
+						div_opdata2_o <= reg2_i;
+						div_start_o <= `DivStop;
+						signed_div_o <= 1'b0;
+						stallreq_for_div <= `NoStop;
+					end else
+					begin
+						div_opdata1_o <= `ZeroWord;
+						div_opdata2_o <= `ZeroWord;
+						div_start_o <= `DivStop;
+						signed_div_o <= 1'b0;
+						stallreq_for_div <= `NoStop;
+					end
+				end
+			endcase
+		end
+	end
+	
 	/* handling HI and LO result */
 	always @(*)
 	begin
@@ -407,6 +491,11 @@ module ex(
 			whilo_o <= `WriteDisable;
 			hi_o <= `ZeroWord;
 			lo_o <= `ZeroWord;
+		end else
+		if ((aluop_i == `EXE_DIV_OP) || (aluop_i == `EXE_DIVU_OP)) begin
+			whilo_o <= `WriteEnable;
+			hi_o <= div_result_i[63:32];
+			lo_o <= div_result_i[31:0];
 		end else
 		if ((aluop_i == `EXE_MADD_OP) || (aluop_i == `EXE_MADDU_OP)) begin
 			whilo_o <= `WriteEnable;
@@ -445,7 +534,7 @@ module ex(
 	/* pipeline stall signal */
 	always @(*)
 	begin
-		stallreq <= stallreq_for_madd_msub;
+		stallreq <= stallreq_for_madd_msub || stallreq_for_div;
 	end
 
 endmodule

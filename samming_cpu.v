@@ -111,6 +111,14 @@ module samming_cpu(
 	wire[`DoubleRegBus] hilo_tmp_i;
 	wire[1:0] cnt_i;
 	
+	// EX <=> DIV
+	wire signed_div;
+	wire[`RegBus] div_opdata1;
+	wire[`RegBus] div_opdata2;
+	wire div_start;
+	wire[`DoubleRegBus] div_result;
+	wire div_ready;
+	
 	/**** testing ****/
 	assign test_signal = wb_wdata_i;
 	
@@ -180,6 +188,9 @@ module samming_cpu(
 		.whilo_o(ex_whilo_o), .hi_o(ex_hi_o), .lo_o(ex_lo_o),
 		.cnt_i(cnt_i), .hilo_tmp_i(hilo_tmp_i),
 		.cnt_o(cnt_o), .hilo_tmp_o(hilo_tmp_o),
+		.div_result_i(div_result), .div_ready_i(div_ready), 
+		.div_opdata1_o(div_opdata1), .div_opdata2_o(div_opdata2),
+		.div_start_o(div_start), .signed_div_o(signed_div),	
 		.stallreq(stallreq_from_ex)
 	);
 	
@@ -217,6 +228,14 @@ module samming_cpu(
 		.clk(clk), .rst(rst),
 		.we(wb_whilo_i), .hi_i(wb_hi_i), .lo_i(wb_lo_i),
 		.hi_o(hi), .lo_o(lo)
+	);
+	
+	/* DIV instantiate */
+	div div0(
+		.clk(clk), .rst(rst),
+		.signed_div_i(signed_div), .opdata1_i(div_opdata1), .opdata2_i(div_opdata2),
+		.start_i(div_start), .annul_i(1'b0),
+		.result_o(div_result), .ready_o(div_ready)
 	);
 	
 	/* pipeline stall controller */
