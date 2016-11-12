@@ -24,6 +24,7 @@ module ex(
 	input wire[`RegBus]			reg2_i,
 	input wire[`RegAddrBus]		wd_i,
 	input wire					wreg_i,
+	input wire[`RegBus]			inst_i,
 	
 	// output to EX-MEM
 	output reg[`RegAddrBus]		wd_o,
@@ -32,6 +33,11 @@ module ex(
 		// specify whether to write register, just transmit from input
 	output reg[`RegBus]			wdata_o,
 		// operation result
+		
+	// output for MEM
+	output wire[`ALUOpBus]		aluop_o,
+	output wire[`RegBus]		mem_addr_o,
+	output wire[`RegBus]		reg2_o,
 		
 	// HI/LO input wires
 	input wire[`RegBus]			hi_i,
@@ -135,6 +141,13 @@ module ex(
 						  : // unsigned compare
 							(reg1_i < reg2_i);
 	assign reg1_i_not = ~reg1_i;
+	
+	// send aluop_o to MEM stage, to determine its load, store type
+	assign aluop_o = aluop_i;
+	assign mem_addr_o = reg1_i + {{16{inst_i[15]}}, inst_i[15:0]};
+		// determine memory address from 32-bit inst: reg1 + signedExt(15:0)
+	assign reg2_o = reg2_i;
+		// it saves to store value or to partly-fill value
 		
 	/* logic operation */
 	always @(*)

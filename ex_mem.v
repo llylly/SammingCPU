@@ -24,6 +24,9 @@ module ex_mem(
 	input wire					ex_whilo,
 	input wire[`RegBus]			ex_hi,
 	input wire[`RegBus]			ex_lo,
+	input wire[`ALUOpBus]		ex_aluop,
+	input wire[`RegBus]			ex_mem_addr,
+	input wire[`RegBus]			ex_reg2,
 	
 	// send to MEM
 	output reg[`RegAddrBus]		mem_wd,
@@ -32,6 +35,9 @@ module ex_mem(
 	output reg					mem_whilo,
 	output reg[`RegBus]			mem_hi,
 	output reg[`RegBus]			mem_lo,
+	output wire[`ALUOpBus]		mem_aluop,
+	output wire[`RegBus]		mem_mem_addr,
+	output wire[`RegBus]		mem_reg2,
 	
 	// port for multi and add/sub operations signal buffer
 	input wire[`DoubleRegBus]	hilo_tmp_i,
@@ -55,6 +61,10 @@ module ex_mem(
 			
 			hilo_tmp_o <= {`ZeroWord, `ZeroWord};
 			cnt_o <= 2'b00;
+			
+			mem_aluop <= `EXE_NOP_OP;
+			mem_mem_addr <= `ZeroWord;
+			mem_reg2 <= `ZeroWord;
 		end else
 		if (stall[3] == `Stop && stall[4] == `NoStop)
 		begin
@@ -68,6 +78,10 @@ module ex_mem(
 			
 			hilo_tmp_o <= hilo_tmp_i;
 			cnt_o <= cnt_i;
+			
+			mem_aluop <= `EXE_NOP_OP;
+			mem_mem_addr <= `ZeroWord;
+			mem_reg2 <= `ZeroWord;
 		end else
 		if (stall[3] == `NoStop)
 		begin
@@ -80,6 +94,10 @@ module ex_mem(
 			
 			hilo_tmp_o <= {`ZeroWord, `ZeroWord};
 			cnt_o <= 2'b00;
+			
+			mem_aluop <= ex_aluop;
+			mem_mem_addr <= exe_mem_addr;
+			mem_reg2 <= ex_reg2;
 		end else
 		begin
 			hilo_tmp_o <= hilo_tmp_i;
