@@ -47,6 +47,15 @@ module samming_cpu(
 	wire[`RegBus] id_reg2_o;
 	wire id_wreg_o;
 	wire[`RegAddrBus] id_wd_o;
+	wire id_is_in_delayslot_o;
+	wire[`RegBus] id_link_address_o;
+	wire is_in_delayslot_i;
+	wire is_in_delayslot_o;
+	wire next_ins_in_delayslot_o;
+	
+	// ID => PC
+	wire id_branch_flag_o;
+	wire[`RegBus] branch_target_address;
 	
 	// ID <=> regfile
 	wire reg1_read;
@@ -63,6 +72,8 @@ module samming_cpu(
 	wire[`RegBus] ex_reg2_i;
 	wire ex_wreg_i;
 	wire[`RegAddrBus] ex_wd_i;
+	wire ex_is_in_delayslot_i;
+	wire[`RegBus] ex_link_address_i;
 	
 	// EX <=> EX-MEM and EX => ID(bypass)
 	wire ex_wreg_o;
@@ -127,7 +138,9 @@ module samming_cpu(
 	
 	/* pc_reg instantiate */
 	pc_reg pc_reg0(
-		.clk(clk), .rst(rst), .stall(stall), .pc(pc), .ce(rom_ce_o)
+		.clk(clk), .rst(rst), .stall(stall), .pc(pc), .ce(rom_ce_o),
+		.branch_flag_i(id_branch_flag_o), 
+		.branch_target_address_i(branch_target_address)
 	);
 	
 	/* IF-ID instantiate */
@@ -152,6 +165,13 @@ module samming_cpu(
 		.reg1_o(id_reg1_o), .reg2_o(id_reg2_o),
 		.wd_o(id_wd_o), .wreg_o(id_wreg_o),
 		
+		// branch
+		.is_in_delayslot_i(is_in_delayslot_i),
+		.next_inst_in_delayslot_o(next_inst_in_delayslot),
+		.branch_flag_o(id_branch_flag_o), .branch_target_address_o(branch_target_address),
+		.link_addr_o(id_link_address_o),
+		.is_in_delayslot_o(id_is_in_delayslot_o),
+		
 		.stallreq(stallreq_from_id)
 	);
 	
@@ -171,7 +191,15 @@ module samming_cpu(
 		.id_wd(id_wd_o), .id_wreg(id_wreg_o),
 		.ex_aluop(ex_aluop_i), .ex_alusel(ex_alusel_i),
 		.ex_reg1(ex_reg1_i), .ex_reg2(ex_reg2_i),
-		.ex_wd(ex_wd_i), .ex_wreg(ex_wreg_i)
+		.ex_wd(ex_wd_i), .ex_wreg(ex_wreg_i),
+		// branch in
+		.id_link_address(id_link_address_o),
+		.id_is_in_delayslot(id_is_in_delayslot_o),
+		.next_inst_in_delayslot_i(next_inst_in_delayslot),
+		// branch out
+		.ex_link_address(ex_link_address_i),
+		.ex_is_in_delayslot(ex_is_in_delayslot_i),
+		.is_in_delayslot_o(is_in_delayslot_i)
 	);
 	
 	/* EX instantiate */
@@ -191,6 +219,9 @@ module samming_cpu(
 		.div_result_i(div_result), .div_ready_i(div_ready), 
 		.div_opdata1_o(div_opdata1), .div_opdata2_o(div_opdata2),
 		.div_start_o(div_start), .signed_div_o(signed_div),	
+		// branch
+		.link_address_i(ex_link_address_i),
+		.is_in_delayslot_i(ex_is_in_delayslot_i),
 		.stallreq(stallreq_from_ex)
 	);
 	
