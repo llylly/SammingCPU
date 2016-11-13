@@ -8,8 +8,16 @@
 + 乘加、乘减与流水线暂停 stage1 2016.11.5 llylly
 + 除法 stage2 2016.11.11 llylly
 + 分支与控制冒险 stage2 2016.11.12 llylly
-+ 访存 TODO
-+ RAM TODO
++ 访存 stage2 2016.11.13 llylly
+
+	采用小端方式实现lwl, lwr, swl, swr指令。
+
++ RAM stage2 2016.11.13 llylly
+	
+	在sopc上，通过ram_adapter连接ram，控制sram，在宏定义为REAL时，sram信号被引出，否则信号引向仿真sram。
+
+	NOTICE: 只是实现，尚未调试
+
 + 串口 TODO
 + CP0 TODO
 + MMU TODO

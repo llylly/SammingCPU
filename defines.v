@@ -84,6 +84,9 @@
 `define EXE_SWL			6'b101010
 `define EXE_SWR			6'b101110
 
+`define EXE_LL			6'b110000
+`define EXE_SC			6'b111000
+
 // function code
 `define EXE_AND			6'b100100
 `define EXE_OR			6'b100101
@@ -211,6 +214,16 @@
 	// real size of instruction ROM (in temp testing version)
 `define InstMemNumLog2	10
 	// real in use width of address bus (in temp testing version)
+	
+/*** macro define related to SRAM ***/
+`define RAMAddrBus		19:0
+	// address width of SRAM
+`define RAMBus			31:0
+	// data width of SRAM
+`define RAMWrite_OP		1'b1
+`define RAMRead_OP		1'b0
+`define DataMemNum		1024
+`define DataWidth		9:0
 
 /*** macro define related to uniform registers (Regfile) ***/
 `define RegAddrBus		4:0

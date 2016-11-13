@@ -32,7 +32,19 @@ module mem_wb(
 	output reg[`RegBus]			wb_wdata,
 	output reg					wb_whilo,
 	output reg[`RegBus]			wb_hi,
-	output reg[`RegBus]			wb_lo
+	output reg[`RegBus]			wb_lo,
+	
+	// port for LL/SC
+	input wire					mem_llbit_we,
+	input wire					mem_llbit_value,
+	output reg					wb_llbit_we,
+	output reg					wb_llbit_value,
+	
+	// port for MEM DFA
+	input wire[1:0]				cnt_i,
+		// EXTENSION for multiple MEM clocks
+	output reg[1:0]				cnt_o
+		// EXTENSION for multiple MEM clocks
 );
 
 	always @(posedge clk)
@@ -46,6 +58,9 @@ module mem_wb(
 			wb_whilo <= `WriteDisable;
 			wb_hi <= `ZeroWord;
 			wb_lo <= `ZeroWord;
+			cnt_o <= 2'b00;
+			wb_llbit_we <= 1'b0;
+			wb_llbit_value <= 1'b0;
 		end else
 		if (stall[4] == `Stop && stall[5] == `NoStop)
 		begin
@@ -56,6 +71,9 @@ module mem_wb(
 			wb_whilo <= `WriteDisable;
 			wb_hi <= `ZeroWord;
 			wb_lo <= `ZeroWord;
+			cnt_o <= cnt_i;
+			wb_llbit_we <= 1'b0;
+			wb_llbit_value <= 1'b0;
 		end else
 		if (stall[4] == `NoStop)
 		begin
@@ -65,6 +83,12 @@ module mem_wb(
 			wb_whilo <= mem_whilo;
 			wb_hi <= mem_hi;
 			wb_lo <= mem_lo;
+			cnt_o <= 2'b00;
+			wb_llbit_we <= mem_llbit_we;
+			wb_llbit_value <= mem_llbit_value;
+		end else
+		begin
+			cnt_o <= cnt_i;
 		end
 	end
 

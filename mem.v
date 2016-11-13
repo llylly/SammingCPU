@@ -27,14 +27,9 @@ module mem(
 	input wire[`ALUOpBus]		aluop_i,
 	input wire[`RegBus]			mem_addr_i,
 	input wire[`RegBus]			reg2_i,
-	
-	// from external RAM stage
-	input wire[`RegBus]			mem_data_i,
-	input wire					mem_ready_i,
-		// EXTENSION for multiple clocks
 		
 	// from WB stage
-	input wire 					cnt_i,
+	input wire[1:0] 			cnt_i,
 		// EXTENSION for multiple clocks
 	
 	// to WB stage
@@ -44,7 +39,25 @@ module mem(
 	output reg					whilo_o,
 	output reg[`RegBus]			hi_o,
 	output reg[`RegBus]			lo_o,
-	output reg					cnt_o,
+	output reg[1:0]				cnt_o,
+		// EXTENSION for multiple clocks
+		
+	// for LL/SC
+	input wire					llbit_i,
+		// llbit input
+	input wire					wb_llbit_we_i,
+		// wb whether to wire
+	input wire					wb_llbit_value_i,
+		// wb write value
+	
+	output reg					llbit_we_o,
+		// whether to write
+	output reg					llbit_value_o,
+		// write value
+	
+	// from external RAM stage
+	input wire[`RegBus]			mem_data_i,
+	input wire					mem_ready_i,
 		// EXTENSION for multiple clocks
 	
 	// to external RAM stage
@@ -69,6 +82,25 @@ module mem(
 	assign mem_we_o = mem_we;
 	assign zero32 = `ZeroWord;
 	
+	reg llbit;
+	
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			llbit <= 1'b0;
+		end else
+		begin
+			if (wb_llbit_we_i == 1'b1)
+			begin
+				llbit <= wb_llbit_value_i;
+			end else
+			begin
+				llbit <= llbit_i;
+			end
+		end
+	end
+	
 	always @(*)
 	begin
 		if (rst == `RstEnable)
@@ -86,6 +118,8 @@ module mem(
 			mem_ce_o <= `ChipDisable;
 			cnt_o <= 2'b00;
 			stallreq <= 1'b0;
+			llbit_we_o <= 1'b0;
+			llbit_value_o <= 1'b0;
 		end else
 		begin
 			wd_o <= wd_i;
@@ -101,6 +135,8 @@ module mem(
 			mem_ce_o <= `ChipDisable;
 			cnt_o <= 2'b00;
 			stallreq <= 1'b0;
+			llbit_we_o <=1'b0;
+			llbit_value_o <= 1'b0;
 			case (aluop_i)
 				`EXE_LB_OP: begin
 					if (cnt_i == 2'b00) 
@@ -297,7 +333,7 @@ module mem(
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteDisable;
-					mem_sel_o <= 1'b1111;
+					mem_sel_o <= 4'b1111;
 					case (mem_addr_i[1:0])
 						2'b00: begin
 							wdata_o <= {mem_data_i[7:0], reg2_i[23:0]};
@@ -333,7 +369,7 @@ module mem(
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteDisable;
-					mem_sel_o <= 1'b1111;
+					mem_sel_o <= 4'b1111;
 					case (mem_addr_i[1:0])
 						2'b00: begin
 							wdata_o <= mem_data_i;
@@ -517,7 +553,7 @@ module mem(
 						end
 						2'b10: begin
 							mem_sel_o <= 4'b1110;
-							mem_data_o <= {reg2_i{23:0], zero32[7:0]};
+							mem_data_o <= {reg2_i[23:0], zero32[7:0]};
 						end
 						2'b11: begin
 							mem_sel_o <= 4'b1111;
@@ -527,6 +563,63 @@ module mem(
 							mem_sel_o <= 4'b0000;
 						end
 					endcase
+				end
+				`EXE_LL_OP: begin
+					if (cnt_i == 2'b00) 
+					begin
+						if (mem_ready_i == 1'b1) 
+						begin
+							cnt_o <= 2'b01;
+						end
+						stallreq <= 1'b1;
+						mem_ce_o <= `ChipEnable;
+					end else
+					begin
+						if (cnt_i == 2'b01)
+						begin
+							cnt_o <= 2'b10;
+						end
+						stallreq <= 1'b0;
+						mem_ce_o <= `ChipDisable;
+					end
+					mem_addr_o <= mem_addr_i;
+					mem_we <= `WriteDisable;
+					wdata_o <= mem_data_i;
+					mem_sel_o <= 4'b1111;
+					llbit_we_o <= 1'b1;
+					llbit_value_o <= 1'b1;
+				end
+				`EXE_SC_OP: begin
+					if (llbit == 1'b1)
+					begin
+						if (cnt_i == 2'b00) 
+						begin
+							if (mem_ready_i == 1'b1) 
+							begin
+								cnt_o <= 2'b01;
+							end
+							stallreq <= 1'b1;
+							mem_ce_o <= `ChipEnable;
+						end else
+						begin
+							if (cnt_i == 2'b01)
+							begin
+								cnt_o <= 2'b10;
+							end
+							stallreq <= 1'b0;
+							mem_ce_o <= `ChipDisable;
+						end
+						mem_addr_o <= mem_addr_i;
+						mem_we <= `WriteEnable;
+						mem_data_o <= reg2_i;
+						mem_sel_o <= 4'b1111;
+						llbit_we_o <= 1'b1;
+						llbit_value_o <= 1'b0;
+						wdata_o <= 32'b1;
+					end else 
+					begin
+						wdata_o <= 32'b0;
+					end
 				end
 				default: begin
 				end

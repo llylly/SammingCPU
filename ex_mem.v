@@ -35,9 +35,9 @@ module ex_mem(
 	output reg					mem_whilo,
 	output reg[`RegBus]			mem_hi,
 	output reg[`RegBus]			mem_lo,
-	output wire[`ALUOpBus]		mem_aluop,
-	output wire[`RegBus]		mem_mem_addr,
-	output wire[`RegBus]		mem_reg2,
+	output reg[`ALUOpBus]		mem_aluop,
+	output reg[`RegBus]			mem_mem_addr,
+	output reg[`RegBus]			mem_reg2,
 	
 	// port for multi and add/sub operations signal buffer
 	input wire[`DoubleRegBus]	hilo_tmp_i,
@@ -96,7 +96,7 @@ module ex_mem(
 			cnt_o <= 2'b00;
 			
 			mem_aluop <= ex_aluop;
-			mem_mem_addr <= exe_mem_addr;
+			mem_mem_addr <= ex_mem_addr;
 			mem_reg2 <= ex_reg2;
 		end else
 		begin

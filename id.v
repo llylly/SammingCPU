@@ -75,6 +75,9 @@ module id(
 	// inst out
 	output wire[`RegBus]		inst_o,
 	
+	// bypass from EX
+	input wire[`ALUOpBus]		ex_aluop_i,
+	
 	// control signal for pipeline stall
 	output wire					stallreq
 
@@ -105,6 +108,20 @@ module id(
 		// save next inst address
 	assign imm_sll2_signedext = {{14{inst_i[15]}}, inst_i[15:0], 2'b00};
 		// used in branch inst as offset
+		
+	reg stallreq_for_reg1_load_relate;
+	reg stallreq_for_reg2_load_relate;
+	wire pre_inst_is_load;
+	
+	assign pre_inst_is_load =(	(ex_aluop_i == `EXE_LB_OP) ||
+								(ex_aluop_i == `EXE_LBU_OP) ||
+								(ex_aluop_i == `EXE_LH_OP) ||
+								(ex_aluop_i == `EXE_LHU_OP) ||
+								(ex_aluop_i == `EXE_LW_OP) ||
+								(ex_aluop_i == `EXE_LWR_OP) ||
+								(ex_aluop_i == `EXE_LWL_OP) ||
+								(ex_aluop_i == `EXE_LL_OP) ||
+								(ex_aluop_i == `EXE_SC_OP)) ? 1'b1 : 1'b0;
 
 	/* transcode instruction */
 	always @(*)
@@ -826,6 +843,24 @@ module id(
 					wd_o <= inst_i[20:16];
 					instValid <= `InstValid;
 				end
+				`EXE_LL: begin
+					wreg_o <= `WriteEnable;
+					aluop_o <= `EXE_LL_OP;
+					alusel_o <= `EXE_RES_LOAD_STORE;
+					reg1_read_o <= 1'b1;
+					reg2_read_o <= 1'b0;
+					wd_o <= inst_i[20:16];
+					instValid <= `InstValid;
+				end
+				`EXE_SC: begin
+					wreg_o <= `WriteEnable;
+					aluop_o <= `EXE_SC_OP;
+					alusel_o <= `EXE_RES_LOAD_STORE;
+					reg1_read_o <= 1'b1;
+					reg2_read_o <= 1'b1;
+					wd_o <= inst_i[20:16];
+					instValid <= `InstValid;
+				end
 				default: begin
 				
 				end
@@ -945,7 +980,32 @@ module id(
 		end
 	end
 	
+	/* handle load relate: stall when necessary */
+	always @(*)
+	begin
+		stallreq_for_reg1_load_relate <= `NoStop;
+		if (rst == `RstEnable)
+		begin
+		end else
+		if (pre_inst_is_load == 1'b1 && ex_wd_i == reg1_addr_o && reg1_read_o == 1'b1)
+		begin
+			stallreq_for_reg1_load_relate <= `Stop;
+		end
+	end
+	
+	always @(*)
+	begin
+		stallreq_for_reg2_load_relate <= `NoStop;
+		if (rst == `RstEnable)
+		begin
+		end else
+		if (pre_inst_is_load == 1'b1 && ex_wd_i == reg2_addr_o && reg2_read_o == 1'b1)
+		begin
+			stallreq_for_reg2_load_relate <= `Stop;
+		end
+	end
+	
 	/* pipeline stall signal */
-	assign stallreq = `NoStop;
+	assign stallreq = stallreq_for_reg1_load_relate || stallreq_for_reg2_load_relate;
 
 endmodule
