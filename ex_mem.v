@@ -44,7 +44,16 @@ module ex_mem(
 	input wire[1:0]				cnt_i,
 	
 	output reg[`DoubleRegBus]	hilo_tmp_o,
-	output reg[1:0]				cnt_o
+	output reg[1:0]				cnt_o,
+	
+	// port for cp0
+	input wire[`RegBus]			ex_cp0_reg_data,
+	input wire[`RegAddrBus]		ex_cp0_reg_write_addr,
+	input wire					ex_cp0_reg_we,
+	
+	output reg[`RegBus]			mem_cp0_reg_data,
+	output reg[`RegAddrBus]		mem_cp0_reg_write_addr,
+	output reg					mem_cp0_reg_we
 );
 
 	always @(posedge clk)
@@ -65,6 +74,10 @@ module ex_mem(
 			mem_aluop <= `EXE_NOP_OP;
 			mem_mem_addr <= `ZeroWord;
 			mem_reg2 <= `ZeroWord;
+			
+			mem_cp0_reg_we <= `WriteDisable;
+			mem_cp0_reg_write_addr <= 5'b00000;
+			mem_cp0_reg_data <= `ZeroWord;
 		end else
 		if (stall[3] == `Stop && stall[4] == `NoStop)
 		begin
@@ -82,6 +95,10 @@ module ex_mem(
 			mem_aluop <= `EXE_NOP_OP;
 			mem_mem_addr <= `ZeroWord;
 			mem_reg2 <= `ZeroWord;
+			
+			mem_cp0_reg_we <= `WriteDisable;
+			mem_cp0_reg_write_addr <= 5'b00000;
+			mem_cp0_reg_data <= `ZeroWord;
 		end else
 		if (stall[3] == `NoStop)
 		begin
@@ -98,6 +115,10 @@ module ex_mem(
 			mem_aluop <= ex_aluop;
 			mem_mem_addr <= ex_mem_addr;
 			mem_reg2 <= ex_reg2;
+			
+			mem_cp0_reg_we <= ex_cp0_reg_we;
+			mem_cp0_reg_write_addr <= ex_cp0_reg_write_addr;
+			mem_cp0_reg_data <= ex_cp0_reg_data;
 		end else
 		begin
 			hilo_tmp_o <= hilo_tmp_i;

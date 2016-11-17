@@ -40,6 +40,15 @@ module mem_wb(
 	output reg					wb_llbit_we,
 	output reg					wb_llbit_value,
 	
+	// port for cp0
+	input wire[`RegBus]			mem_cp0_reg_data,
+	input wire[`RegAddrBus]		mem_cp0_reg_write_addr,
+	input wire					mem_cp0_reg_we,
+	
+	output reg[`RegBus]			wb_cp0_reg_data,
+	output reg[`RegAddrBus]		wb_cp0_reg_write_addr,
+	output reg					wb_cp0_reg_we,
+	
 	// port for MEM DFA
 	input wire[1:0]				cnt_i,
 		// EXTENSION for multiple MEM clocks
@@ -61,6 +70,9 @@ module mem_wb(
 			cnt_o <= 2'b00;
 			wb_llbit_we <= 1'b0;
 			wb_llbit_value <= 1'b0;
+			wb_cp0_reg_we <= `WriteDisable;
+			wb_cp0_reg_write_addr <= 5'b00000;
+			wb_cp0_reg_data <= `ZeroWord;
 		end else
 		if (stall[4] == `Stop && stall[5] == `NoStop)
 		begin
@@ -74,6 +86,9 @@ module mem_wb(
 			cnt_o <= cnt_i;
 			wb_llbit_we <= 1'b0;
 			wb_llbit_value <= 1'b0;
+			wb_cp0_reg_we <= `WriteDisable;
+			wb_cp0_reg_write_addr <= 5'b00000;
+			wb_cp0_reg_data <= `ZeroWord;
 		end else
 		if (stall[4] == `NoStop)
 		begin
@@ -86,6 +101,9 @@ module mem_wb(
 			cnt_o <= 2'b00;
 			wb_llbit_we <= mem_llbit_we;
 			wb_llbit_value <= mem_llbit_value;
+			wb_cp0_reg_we <= mem_cp0_reg_we;
+			wb_cp0_reg_write_addr <= mem_cp0_reg_write_addr;
+			wb_cp0_reg_data <= mem_cp0_reg_data;
 		end else
 		begin
 			cnt_o <= cnt_i;

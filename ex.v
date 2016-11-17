@@ -79,6 +79,21 @@ module ex(
 	input wire[`RegBus]			link_address_i,
 	input wire					is_in_delayslot_i,
 	
+	// input related to CP0
+	input wire[`RegBus]			cp0_reg_data_i,
+	input wire[`RegBus]			wb_cp0_reg_data,
+	input wire[`RegAddrBus]		wb_cp0_reg_write_addr,
+	input wire					wb_cp0_reg_we,
+	input wire[`RegBus]			mem_cp0_reg_data,
+	input wire[`RegAddrBus]		mem_cp0_reg_write_addr,
+	input wire					mem_cp0_reg_we,
+	
+	//output to cp0
+	output reg[`RegAddrBus]		cp0_reg_read_addr_o,
+	output reg[`RegBus]			cp0_reg_data_o,
+	output reg[`RegAddrBus]		cp0_reg_write_addr_o,
+	output reg					cp0_reg_we_o,
+	
 	// control signal for pipeline stall
 	output reg					stallreq
 	
@@ -224,6 +239,23 @@ module ex(
 				end
 				`EXE_MOVN_OP: begin
 					moveRes <= reg1_i;
+				end
+				`EXE_MFC0_OP: begin
+					cp0_reg_read_addr_o <= inst_i[15:11];
+					moveRes <= cp0_reg_data_i;
+					
+					if (mem_cp0_reg_we == `WriteEnable && 
+						mem_cp0_reg_write_addr == inst_i[15:11])
+					begin
+						moveRes <= mem_cp0_reg_data;
+					end else
+					if (wb_cp0_reg_we == `WriteEnable &&
+						wb_cp0_reg_write_addr == inst_i[15:11])
+					begin
+						moveRes <= wb_cp0_reg_data;
+					end
+				end
+				default: begin
 				end
 			endcase
 		end
@@ -548,6 +580,28 @@ module ex(
 			whilo_o <= `WriteDisable;
 			hi_o <= `ZeroWord;
 			lo_o <= `ZeroWord;
+		end
+	end
+	
+	/* determine signals given to cp0 */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			cp0_reg_write_addr_o <= 5'b00000;
+			cp0_reg_we_o <= `WriteDisable;
+			cp0_reg_data_o <= `ZeroWord;
+		end else
+		if (aluop_i == `EXE_MTC0_OP)
+		begin
+			cp0_reg_write_addr_o <= inst_i[15:11];
+			cp0_reg_we_o <= `WriteEnable;
+			cp0_reg_data_o <= reg1_i;
+		end else
+		begin
+			cp0_reg_write_addr_o <= 5'b00000;
+			cp0_reg_we_o <= `WriteDisable;
+			cp0_reg_data_o <= `ZeroWord;
 		end
 	end
 	

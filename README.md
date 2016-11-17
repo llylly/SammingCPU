@@ -7,6 +7,9 @@
 + 单周期算术指令 stage1 2016.11.5 llylly
 + 乘加、乘减与流水线暂停 stage1 2016.11.5 llylly
 + 除法 stage2 2016.11.11 llylly
+
+	当前div结果重算后并不马上清零，以免stall时间因其他原因过长时，结果被清零，导致最后计算值出错
+
 + 分支与控制冒险 stage2 2016.11.12 llylly
 + 访存 stage2 2016.11.13 llylly
 
@@ -19,7 +22,7 @@
 	NOTICE: 只是实现，尚未调试
 
 + 串口 TODO
-+ CP0 TODO
++ CP0 stage3 2016.11.18 llylly
 + MMU TODO
 + 异常处理 TODO
 + WishBone TODO

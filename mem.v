@@ -71,6 +71,15 @@ module mem(
 		// data to write to memory
 	output reg					mem_ce_o,
 		// RAM enabling signal
+		
+	// port for cp0
+	input wire[`RegBus]			cp0_reg_data_i,
+	input wire[`RegAddrBus]		cp0_reg_write_addr_i,
+	input wire					cp0_reg_we_i,
+	
+	output reg[`RegBus]			cp0_reg_data_o,
+	output reg[`RegAddrBus]		cp0_reg_write_addr_o,
+	output reg					cp0_reg_we_o,
 	
 	output reg					stallreq
 		// EXTENSION request for stall
@@ -120,6 +129,10 @@ module mem(
 			stallreq <= 1'b0;
 			llbit_we_o <= 1'b0;
 			llbit_value_o <= 1'b0;
+			
+			cp0_reg_we_o <= `WriteDisable;
+			cp0_reg_write_addr_o <= 5'b00000;
+			cp0_reg_data_o <= `ZeroWord;
 		end else
 		begin
 			wd_o <= wd_i;
@@ -137,6 +150,11 @@ module mem(
 			stallreq <= 1'b0;
 			llbit_we_o <=1'b0;
 			llbit_value_o <= 1'b0;
+			
+			cp0_reg_we_o <= cp0_reg_we_i;
+			cp0_reg_write_addr_o <= cp0_reg_write_addr_i;
+			cp0_reg_data_o <= cp0_reg_data_i;
+			
 			case (aluop_i)
 				`EXE_LB_OP: begin
 					if (cnt_i == 2'b00) 

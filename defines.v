@@ -194,6 +194,8 @@
 `define EXE_SW_OP		8'b11101011
 `define EXE_SWL_OP		8'b11101010
 `define EXE_SWR_OP		8'b11101110
+`define EXE_MFC0_OP		8'b01011101
+`define EXE_MTC0_OP		8'b01100000
 
 // ALU Sel
 `define EXE_RES_NOP 		3'b000
@@ -248,7 +250,7 @@
 `define Stop			1'b1
 `define NoStop			1'b0
 
-/*** DIV module signals ***/
+/*** DIV module macro ***/
 `define DivFree			2'b00
 `define DivByZero		2'b01
 `define DivOn			2'b10
@@ -258,8 +260,20 @@
 `define DivStart		1'b1
 `define DivStop			1'b0
 
-/*** Branch signals ***/
+/*** Branch macro ***/
 `define Branch 			1'b1
 `define NotBranch		1'b0
 `define InDelaySlot		1'b1
 `define NotInDelaySlot	1'b0
+
+/*** CP0 macro ***/
+`define CP0_REG_COUNT	5'b01001
+`define CP0_REG_COMPARE	5'b01011
+`define CP0_REG_STATUS	5'b01100
+`define CP0_REG_CAUSE	5'b01101
+`define CP0_REG_EPC		5'b01110
+`define CP0_REG_PRID	5'b01111
+`define CP0_REG_CONFIG	5'b10000
+
+`define InterruptAssert	1'b1
+`define InterruptNotAssert 1'b0

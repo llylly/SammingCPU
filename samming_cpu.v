@@ -40,6 +40,12 @@ module samming_cpu(
 		// data to write to memory
 	output wire					ram_ce_o,
 	
+	// port of cp0
+	input wire[5:0]				int_i,
+		// hardware interrupt input
+	output wire					timer_int_o,
+		// timer interrupt output
+	
 	output wire[`RegBus]		test_signal
 		// used only for testing
 
@@ -102,6 +108,13 @@ module samming_cpu(
 	wire[`ALUOpBus] ex_aluop_o;
 	wire[`RegBus] ex_mem_addr_o;
 	wire[`RegBus] ex_reg2_o;
+	wire[`RegBus] ex_cp0_reg_data_o;
+	wire[`RegAddrBus] ex_cp0_reg_write_addr_o;
+	wire ex_cp0_reg_we_o;
+	
+	// EX <=> CP0
+	wire[`RegAddrBus] ex_cp0_reg_read_addr_o;
+	wire[`RegBus] cp_data_o;
 	
 	// EX-MEM <=> MEM
 	wire mem_wreg_i;
@@ -113,6 +126,9 @@ module samming_cpu(
 	wire[`ALUOpBus] mem_aluop_i;
 	wire[`RegBus] mem_mem_addr_i;
 	wire[`RegBus] mem_reg2_i;
+	wire[`RegBus] mem_cp0_reg_data_i;
+	wire[`RegAddrBus] mem_cp0_reg_write_addr_i;
+	wire mem_cp0_reg_we_i;
 	
 	// MEM <=> MEM-WB and MEM => ID(bypass)
 	wire mem_wreg_o;
@@ -123,6 +139,9 @@ module samming_cpu(
 	wire[`RegBus] mem_lo_o;
 	wire mem_llbit_value_o;
 	wire mem_llbit_we_o;
+	wire[`RegBus] mem_cp0_reg_data_o;
+	wire[`RegAddrBus] mem_cp0_reg_write_addr_o;
+	wire mem_cp0_reg_we_o;
 	
 	// MEM-WB <=> WB
 	wire wb_wreg_i;
@@ -133,6 +152,9 @@ module samming_cpu(
 	wire[`RegBus] wb_lo_i;
 	wire wb_llbit_value_i;
 	wire wb_llbit_we_i;	
+	wire[`RegBus] wb_cp0_reg_data_i;
+	wire[`RegAddrBus] wb_cp0_reg_write_addr_i;
+	wire wb_cp0_reg_we_i;
 	
 	// WB(HI/LO) => EX
 	wire[`RegBus] hi;
@@ -267,6 +289,18 @@ module samming_cpu(
 		// branch
 		.link_address_i(ex_link_address_i),
 		.is_in_delayslot_i(ex_is_in_delayslot_i),
+		// cp0
+		.cp0_reg_data_i(cp_data_o),
+		.wb_cp0_reg_data(wb_cp0_reg_data_i),
+		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
+		.wb_cp0_reg_we(wb_cp0_reg_we_i),
+		.mem_cp0_reg_data(mem_cp0_reg_data_o),
+		.mem_cp0_reg_write_addr(mem_cp0_reg_write_addr_o),
+		.mem_cp0_reg_we(mem_cp0_reg_we_o),
+		.cp0_reg_read_addr_o(ex_cp0_reg_read_addr_o),
+		.cp0_reg_data_o(ex_cp0_reg_data_o),
+		.cp0_reg_write_addr_o(ex_cp0_reg_write_addr_o),
+		.cp0_reg_we_o(ex_cp0_reg_we_o),
 		.stallreq(stallreq_from_ex)
 	);
 
@@ -280,6 +314,12 @@ module samming_cpu(
 		.mem_aluop(mem_aluop_i), .mem_mem_addr(mem_mem_addr_i), .mem_reg2(mem_reg2_i),
 		.mem_whilo(mem_whilo_i), .mem_hi(mem_hi_i), .mem_lo(mem_lo_i),
 		.cnt_i(cnt_o), .hilo_tmp_i(hilo_tmp_o),
+		.ex_cp0_reg_data(ex_cp0_reg_data_o),
+		.ex_cp0_reg_write_addr(ex_cp0_reg_write_addr_o),
+		.ex_cp0_reg_we(ex_cp0_reg_we_o),
+		.mem_cp0_reg_data(mem_cp0_reg_data_i),
+		.mem_cp0_reg_write_addr(mem_cp0_reg_write_addr_i),
+		.mem_cp0_reg_we(mem_cp0_reg_we_i),
 		.cnt_o(cnt_i), .hilo_tmp_o(hilo_tmp_i)
 	);
 	
@@ -296,6 +336,12 @@ module samming_cpu(
 		.cnt_i(mem_cnt_i), .cnt_o(mem_cnt_o),
 		.llbit_i(llbit_o), .wb_llbit_we_i(wb_llbit_we_i), .wb_llbit_value_i(wb_llbit_value_i),
 		.llbit_we_o(mem_llbit_we_o), .llbit_value_o(mem_llbit_value_o),
+		.cp0_reg_data_i(mem_cp0_reg_data_i),
+		.cp0_reg_write_addr_i(mem_cp0_reg_write_addr_i),
+		.cp0_reg_we_i(mem_cp0_reg_we_i),
+		.cp0_reg_data_o(mem_cp0_reg_data_o),
+		.cp0_reg_write_addr_o(mem_cp0_reg_write_addr_o),
+		.cp0_reg_we_o(mem_cp0_reg_we_o),
 		.stallreq(stallreq_from_mem)
 	);
 	
@@ -308,7 +354,23 @@ module samming_cpu(
 		.wb_whilo(wb_whilo_i), .wb_hi(wb_hi_i), .wb_lo(wb_lo_i),
 		.mem_llbit_we(mem_llbit_we_o), .mem_llbit_value(mem_llbit_value_o),
 		.wb_llbit_we(wb_llbit_we_i), .wb_llbit_value(wb_llbit_value_i),
+		.mem_cp0_reg_data(mem_cp0_reg_data_o),
+		.mem_cp0_reg_write_addr(mem_cp0_reg_write_addr_o),
+		.mem_cp0_reg_we(mem_cp0_reg_we_o),
+		.wb_cp0_reg_data(wb_cp0_reg_data_i),
+		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
+		.wb_cp0_reg_we(wb_cp0_reg_we_i),
 		.cnt_i(mem_cnt_o), .cnt_o(mem_cnt_i)
+	);
+	
+	/* cp0 registers instantiate */
+	cp0_reg cp0_reg0(
+		.clk(clk), .rst(rst),
+		.data_i(wb_cp0_reg_data_i), .waddr_i(wb_cp0_reg_write_addr_i), .we_i(wb_cp0_reg_we_i),
+		.raddr_i(ex_cp0_reg_read_addr_o), 
+		.int_i(int_i),
+		.data_o(cp_data_o),
+		.timer_int_o(timer_int_o)
 	);
 	
 	/* HI/LO register instantiate */
