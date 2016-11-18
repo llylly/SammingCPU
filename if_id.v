@@ -16,6 +16,7 @@ module if_id(
 	input wire					clk,
 	input wire					rst,
 	input wire[5:0]				stall,
+	input wire					flush,
 	
 	// signals from IF
 	input wire[`InstAddrBus]	if_pc,
@@ -31,6 +32,11 @@ module if_id(
 		if (rst == `RstEnable)
 		begin
 			// When RST on, all signals sent is zero
+			id_pc <= `ZeroWord;
+			id_inst <= `ZeroWord;
+		end else
+		if (flush == 1'b1) 
+		begin
 			id_pc <= `ZeroWord;
 			id_inst <= `ZeroWord;
 		end else

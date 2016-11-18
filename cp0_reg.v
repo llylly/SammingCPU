@@ -19,11 +19,11 @@ module cp0_reg(
 	
 	input wire					we_i,
 		// whether to write cp0 registers
-	input wire[`RegAddrBus]		waddr_i,
+	input wire[`CP0RegAddrBus]	waddr_i,
 		// write address
 	input wire[`RegBus]			data_i,
 		// write data
-	input wire[`RegAddrBus]		raddr_i,
+	input wire[`CP0RegAddrBus]	raddr_i,
 		// read address
 		
 	input wire[5:0]				int_i,
@@ -41,6 +41,12 @@ module cp0_reg(
 	output reg[`RegBus]			config_o,
 	output reg[`RegBus]			prid_o,
 		// read-only
+	output reg[`RegBus]			ebase_o,
+	
+	// exception input
+	input wire[`ExceptBus]		excepttype_i,
+	input wire[`RegBus]			current_inst_addr_i,
+	input wire					is_in_delayslot_i,
 	
 	output reg					timer_int_o
 		// whether timer interrupt happened
@@ -60,6 +66,7 @@ module cp0_reg(
 			prid_o <= 32'b00000000010100110000000100000010;
 				// name: S
 			timer_int_o <= `InterruptNotAssert;
+			ebase_o <= `DefaultEBase;
 		end else
 		begin
 			count_o <= count_o + 1;
@@ -112,8 +119,108 @@ module cp0_reg(
 						cause_o[22] <= data_i[22];
 							// WP
 					end
+					`CP0_REG_EBASE: begin
+						ebase_o <= data_i;
+					end
 				endcase
 			end
+			
+			// exception handle
+			case (excepttype_i)
+				`INTERRUPT_EXP: begin
+					if (is_in_delayslot_i == `InDelaySlot)
+					begin
+						epc_o <= current_inst_addr_i - 4;
+						// Cause : BD
+						cause_o[31] <= 1'b1;
+					end else
+					begin
+						epc_o <= current_inst_addr_i;
+						// Cause : BD
+						cause_o[31] <= 1'b0;
+					end
+					status_o[1] <= 1'b1;
+					cause_o[6:2] <= 5'b00000;
+				end
+				`SYSCALL_EXP: begin
+					if (status_o[1] == 1'b0)
+					begin
+						if (is_in_delayslot_i == `InDelaySlot)
+						begin
+							epc_o <= current_inst_addr_i - 4;
+							cause_o[31] <= 1'b1;
+						end else
+						begin
+							epc_o <= current_inst_addr_i;
+							cause_o[31] <= 1'b0;
+						end
+					end
+					// Status : EXL
+					status_o[1] <= 1'b1;
+					// Cause : ExcCode
+					cause_o[6:2] <= 5'b01000;
+				end
+				`INST_INVAL_EXP: begin
+					if (status_o[1] == 1'b0)
+					begin
+						if (is_in_delayslot_i == `InDelaySlot)
+						begin
+							epc_o <= current_inst_addr_i - 4;
+							cause_o[31] <= 1'b1;
+						end else
+						begin
+							epc_o <= current_inst_addr_i;
+							cause_o[31] <= 1'b0;
+						end
+					end
+					// Status : EXL
+					status_o[1] <= 1'b1;
+					// Cause : ExcCode
+					cause_o[6:2] <= 5'b01010;
+				end
+				`TRAP_EXP: begin
+					if (status_o[1] == 1'b0)
+					begin
+						if (is_in_delayslot_i == `InDelaySlot)
+						begin
+							epc_o <= current_inst_addr_i - 4;
+							cause_o[31] <= 1'b1;
+						end else
+						begin
+							epc_o <= current_inst_addr_i;
+							cause_o[31] <= 1'b0;
+						end
+					end
+					// Status : EXL
+					status_o[1] <= 1'b1;
+					// Cause : ExcCode
+					cause_o[6:2] <= 5'b01101;
+				end
+				`OVERFLOW_EXP: begin
+					if (status_o[1] == 1'b0)
+					begin
+						if (is_in_delayslot_i == `InDelaySlot)
+						begin
+							epc_o <= current_inst_addr_i - 4;
+							cause_o[31] <= 1'b1;
+						end else
+						begin
+							epc_o <= current_inst_addr_i;
+							cause_o[31] <= 1'b0;
+						end
+					end
+					// Status : EXL
+					status_o[1] <= 1'b1;
+					// Cause : ExcCode
+					cause_o[6:2] <= 5'b01100;
+				end
+				`ERET_EXP: begin
+					// Status : EXL
+					status_o[1] <= 1'b0;
+				end
+				default: begin
+				end
+			endcase
 		end
 	end
 	

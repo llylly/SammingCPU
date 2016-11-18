@@ -18,6 +18,11 @@
 module pc_reg(
 	input wire 					clk,
 	input wire 					rst,
+	
+	input wire					flush,
+	input wire[`RegBus]			new_pc,
+		// for interrupt
+	
 	input wire[5:0]				stall,
 	
 	// for branch, when branch_flag = 1 and not stop, then pc = branch target address
@@ -49,6 +54,10 @@ module pc_reg(
 		end else 
 		if (stall[0] == `NoStop)
 		begin
+			if (flush == 1'b1) 
+			begin
+				pc <= new_pc;
+			end else
 			if (branch_flag_i == `Branch)
 			begin
 				pc <= branch_target_address_i;

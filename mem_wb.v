@@ -17,6 +17,7 @@ module mem_wb(
 	input wire					clk,
 	input wire					rst,
 	input wire[5:0]				stall,
+	input wire					flush,
 	
 	// from MEM
 	input wire[`RegAddrBus]		mem_wd,
@@ -42,11 +43,11 @@ module mem_wb(
 	
 	// port for cp0
 	input wire[`RegBus]			mem_cp0_reg_data,
-	input wire[`RegAddrBus]		mem_cp0_reg_write_addr,
+	input wire[`CP0RegAddrBus]	mem_cp0_reg_write_addr,
 	input wire					mem_cp0_reg_we,
 	
 	output reg[`RegBus]			wb_cp0_reg_data,
-	output reg[`RegAddrBus]		wb_cp0_reg_write_addr,
+	output reg[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
 	output reg					wb_cp0_reg_we,
 	
 	// port for MEM DFA
@@ -70,6 +71,21 @@ module mem_wb(
 			cnt_o <= 2'b00;
 			wb_llbit_we <= 1'b0;
 			wb_llbit_value <= 1'b0;
+			wb_cp0_reg_we <= `WriteDisable;
+			wb_cp0_reg_write_addr <= 5'b00000;
+			wb_cp0_reg_data <= `ZeroWord;
+		end else
+		if (flush == 1'b1)
+		begin
+			wb_wd <= `NOPRegAddr;
+			wb_wreg <= `WriteDisable;
+			wb_wdata <= `ZeroWord;
+			wb_whilo <= `WriteDisable;
+			wb_hi <= `ZeroWord;
+			wb_lo <= `ZeroWord;
+			cnt_o <= 2'b00;
+			wb_llbit_we <= 1'b0;
+			wb_llbit_value<= 1'b0;
 			wb_cp0_reg_we <= `WriteDisable;
 			wb_cp0_reg_write_addr <= 5'b00000;
 			wb_cp0_reg_data <= `ZeroWord;

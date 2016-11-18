@@ -69,17 +69,44 @@ module mem(
 		// byte selection signal
 	output reg[`RegBus]			mem_data_o,
 		// data to write to memory
-	output reg					mem_ce_o,
+	output wire					mem_ce_o,
 		// RAM enabling signal
 		
 	// port for cp0
 	input wire[`RegBus]			cp0_reg_data_i,
-	input wire[`RegAddrBus]		cp0_reg_write_addr_i,
+	input wire[`CP0RegAddrBus]	cp0_reg_write_addr_i,
 	input wire					cp0_reg_we_i,
 	
 	output reg[`RegBus]			cp0_reg_data_o,
-	output reg[`RegAddrBus]		cp0_reg_write_addr_o,
+	output reg[`CP0RegAddrBus]	cp0_reg_write_addr_o,
 	output reg					cp0_reg_we_o,
+	
+	// for interrupt handle
+	// port from EX
+	input wire[`ExceptBus]		excepttype_i,
+	input wire					is_in_delayslot_i,
+	input wire[`InstAddrBus]	current_inst_address_i,
+	input wire[`RegBus]			inst_i,
+	
+	// port from CP0
+	input wire[`RegBus]			cp0_status_i,
+	input wire[`RegBus]			cp0_cause_i,
+	input wire[`RegBus]			cp0_epc_i,
+	
+	// port from wb bypass
+	input wire					wb_cp0_reg_we,
+	input wire[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
+	input wire[`RegBus]			wb_cp0_reg_data,
+	
+	// port to cp0 (some also to ctrl)
+	output reg[`ExceptBus]		excepttype_o,
+		// final except type
+	output wire[`RegBus]		cp0_epc_o,
+		// epc for CP0
+	output wire					is_in_delayslot_o,
+		// whether instruction in this stage is in delay slot
+	output wire[`RegBus]		current_inst_address_o,
+		// address of instruciton in this stage
 	
 	output reg					stallreq
 		// EXTENSION request for stall
@@ -87,12 +114,23 @@ module mem(
 
 	wire[`RegBus] zero32;
 	reg mem_we;
-	
 	assign mem_we_o = mem_we;
+	reg mem_ce;
+	
 	assign zero32 = `ZeroWord;
 	
 	reg llbit;
 	
+	// used to save latest value from CP0
+	reg[`RegBus]				cp0_status;
+	reg[`RegBus]				cp0_cause;
+	reg[`RegBus]				cp0_epc;
+	
+	// these to be sent to CP0
+	assign is_in_delayslot_o = is_in_delayslot_i;
+	assign current_inst_address_o = current_inst_address_i;
+	
+	/* handling LLbit, which is used in LL/SC operations */
 	always @(*)
 	begin
 		if (rst == `RstEnable)
@@ -124,7 +162,7 @@ module mem(
 			mem_we <= `WriteDisable;
 			mem_sel_o <= 4'b0000;
 			mem_data_o <= `ZeroWord;
-			mem_ce_o <= `ChipDisable;
+			mem_ce <= `ChipDisable;
 			cnt_o <= 2'b00;
 			stallreq <= 1'b0;
 			llbit_we_o <= 1'b0;
@@ -145,7 +183,7 @@ module mem(
 			mem_we <= `WriteDisable;
 			mem_sel_o <= 4'b1111;
 			mem_data_o <= `ZeroWord;
-			mem_ce_o <= `ChipDisable;
+			mem_ce <= `ChipDisable;
 			cnt_o <= 2'b00;
 			stallreq <= 1'b0;
 			llbit_we_o <=1'b0;
@@ -164,7 +202,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -172,7 +210,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -206,7 +244,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -214,7 +252,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -248,7 +286,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -256,7 +294,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -282,7 +320,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -290,7 +328,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -316,7 +354,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -324,7 +362,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -339,7 +377,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -347,7 +385,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteDisable;
@@ -375,7 +413,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -383,7 +421,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteDisable;
@@ -411,7 +449,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -419,7 +457,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteEnable;
@@ -450,7 +488,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -458,7 +496,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteEnable;
@@ -483,7 +521,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -491,7 +529,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteEnable;
@@ -506,7 +544,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -514,7 +552,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteEnable;
@@ -548,7 +586,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -556,7 +594,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= {mem_addr_i[31:2], 2'b00};
 					mem_we <= `WriteEnable;
@@ -590,7 +628,7 @@ module mem(
 							cnt_o <= 2'b01;
 						end
 						stallreq <= 1'b1;
-						mem_ce_o <= `ChipEnable;
+						mem_ce <= `ChipEnable;
 					end else
 					begin
 						if (cnt_i == 2'b01)
@@ -598,7 +636,7 @@ module mem(
 							cnt_o <= 2'b10;
 						end
 						stallreq <= 1'b0;
-						mem_ce_o <= `ChipDisable;
+						mem_ce <= `ChipDisable;
 					end
 					mem_addr_o <= mem_addr_i;
 					mem_we <= `WriteDisable;
@@ -617,7 +655,7 @@ module mem(
 								cnt_o <= 2'b01;
 							end
 							stallreq <= 1'b1;
-							mem_ce_o <= `ChipEnable;
+							mem_ce <= `ChipEnable;
 						end else
 						begin
 							if (cnt_i == 2'b01)
@@ -625,7 +663,7 @@ module mem(
 								cnt_o <= 2'b10;
 							end
 							stallreq <= 1'b0;
-							mem_ce_o <= `ChipDisable;
+							mem_ce <= `ChipDisable;
 						end
 						mem_addr_o <= mem_addr_i;
 						mem_we <= `WriteEnable;
@@ -644,5 +682,109 @@ module mem(
 			endcase
 		end
 	end
+	
+	/* read latest value of CP0 registers */
+	// NOTICE: bypass can be deleted after I add 3 bubbles once encountering mtc0
+	// status reg
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			cp0_status <= `ZeroWord;
+		end else
+		if ((wb_cp0_reg_we == `WriteEnable) &&
+			(wb_cp0_reg_write_addr == `CP0_REG_STATUS))
+		begin
+			cp0_status <= wb_cp0_reg_data;
+		end else
+		begin
+			cp0_status <= cp0_status_i;
+		end
+	end
+	
+	// epc
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			cp0_epc <= `ZeroWord;
+		end else
+		if ((wb_cp0_reg_we == `WriteEnable) &&
+			(wb_cp0_reg_write_addr == `CP0_REG_EPC))
+		begin
+			cp0_epc <= wb_cp0_reg_data;
+		end else
+		begin
+			cp0_epc <= cp0_epc_i;
+		end
+	end
+	assign cp0_epc_o = cp0_epc;
+	
+	// cause
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			cp0_cause <= `ZeroWord;
+		end else
+		if ((wb_cp0_reg_we == `WriteEnable) &&
+			(wb_cp0_reg_write_addr == `CP0_REG_CAUSE))
+		begin
+			cp0_cause <= wb_cp0_reg_data;
+		end else
+		begin
+			cp0_cause <= cp0_cause_i;
+		end
+	end
+	
+	/* give final exception type */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			excepttype_o <= `ZeroWord;
+		end else
+		begin
+			excepttype_o <= `ZeroWord;
+			// not a null inst
+			if (inst_i != `ZeroWord)
+			begin
+				//interrupt
+				if (((cp0_cause[15:8] & (cp0_status[15:8])) != 8'h00) &&
+					(cp0_status[1] == 1'b0) &&
+					(cp0_status[0] == 1'b1))
+				begin
+					excepttype_o <= `INTERRUPT_EXP;
+				end else
+				// syscall
+				if (excepttype_i[8] == 1'b1)
+				begin
+					excepttype_o <= `SYSCALL_EXP;
+				end else
+				// inst invalid
+				if (excepttype_i[9] == 1'b1)
+				begin
+					excepttype_o <= `INST_INVAL_EXP;
+				end else
+				// trap
+				if (excepttype_i[10] == 1'b1)
+				begin
+					excepttype_o <= `TRAP_EXP;
+				end else
+				// overflow
+				if (excepttype_i[11] == 1'b1)
+				begin
+					excepttype_o <= `OVERFLOW_EXP;
+				end else
+				if (excepttype_i[12] == 1'b1)
+				begin
+					excepttype_o <= `ERET_EXP;
+				end
+			end
+		end
+	end
+	
+	/* forbid mem_ce signal once exception occurred to prevent data writing to RAM */
+	assign mem_ce_o = mem_ce & (~(|excepttype_o));
 
 endmodule

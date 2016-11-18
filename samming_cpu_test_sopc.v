@@ -75,6 +75,11 @@ module samming_cpu_test_sopc(
 	);
 	`endif
 	
+	wire[5:0] int_i;
+	wire timer_int;
+	
+	assign int_i = {5'b00000, timer_int};
+	
 	samming_cpu samming_cpu0(
 		.clk(clk), .rst(rst),
 		.rom_addr_o(inst_addr), .rom_data_i(inst),
@@ -82,6 +87,7 @@ module samming_cpu_test_sopc(
 		.ram_addr_o(ram_addr_o), .ram_we_o(ram_we_o),
 		.ram_sel_o(ram_sel_o), .ram_data_o(ram_data_o), .ram_ce_o(ram_ce_o),
 		.ram_data_i(ram_data_i), .ram_ready_i(ram_ready_i),
+		.int_i(int_i), .timer_int_o(timer_int),
 		.test_signal(test_signal)
 	);
 	

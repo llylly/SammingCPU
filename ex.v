@@ -38,6 +38,7 @@ module ex(
 	output wire[`ALUOpBus]		aluop_o,
 	output wire[`RegBus]		mem_addr_o,
 	output wire[`RegBus]		reg2_o,
+	output wire[`RegBus]		inst_o,
 		
 	// HI/LO input wires
 	input wire[`RegBus]			hi_i,
@@ -82,17 +83,26 @@ module ex(
 	// input related to CP0
 	input wire[`RegBus]			cp0_reg_data_i,
 	input wire[`RegBus]			wb_cp0_reg_data,
-	input wire[`RegAddrBus]		wb_cp0_reg_write_addr,
+	input wire[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
 	input wire					wb_cp0_reg_we,
 	input wire[`RegBus]			mem_cp0_reg_data,
-	input wire[`RegAddrBus]		mem_cp0_reg_write_addr,
+	input wire[`CP0RegAddrBus]	mem_cp0_reg_write_addr,
 	input wire					mem_cp0_reg_we,
 	
-	//output to cp0
-	output reg[`RegAddrBus]		cp0_reg_read_addr_o,
+	// output to cp0
+	output reg[`CP0RegAddrBus]	cp0_reg_read_addr_o,
 	output reg[`RegBus]			cp0_reg_data_o,
-	output reg[`RegAddrBus]		cp0_reg_write_addr_o,
+	output reg[`CP0RegAddrBus]	cp0_reg_write_addr_o,
 	output reg					cp0_reg_we_o,
+	
+	// input related to interrupt
+	input wire[`InstAddrBus]	current_inst_address_i,
+	input wire[`ExceptBus]		excepttype_i,
+	
+	// output related to interrupt
+	output wire[`InstAddrBus]	current_inst_address_o,
+	output wire[`ExceptBus]		excepttype_o,
+	output wire					is_in_delayslot_o,
 	
 	// control signal for pipeline stall
 	output reg					stallreq
@@ -140,7 +150,11 @@ module ex(
 	/* calculate results of some variables */
 	assign reg2_i_mux = ((aluop_i == `EXE_SUB_OP) || 
 						(aluop_i == `EXE_SUBU_OP) || 
-						(aluop_i == `EXE_SLT_OP)) 
+						(aluop_i == `EXE_SLT_OP) ||
+						(aluop_i == `EXE_TLT_OP) ||
+						(aluop_i == `EXE_TLTI_OP) ||
+						(aluop_i == `EXE_TGE_OP) ||
+						(aluop_i == `EXE_TGEI_OP)) 
 						? 
 							(~reg2_i) + 1 
 						:
@@ -148,7 +162,11 @@ module ex(
 	assign result_sum = reg1_i + reg2_i_mux;
 	assign ov_sum =    ((!reg1_i[31] && !reg2_i_mux[31]) && (result_sum[31]))
 					|| ((reg1_i[31] && reg2_i_mux[31]) && (!result_sum[31])); // overflow check for signed
-	assign reg1_lt_reg2 = (aluop_i == `EXE_SLT_OP) 
+	assign reg1_lt_reg2 = 	((aluop_i == `EXE_SLT_OP) ||
+							(aluop_i == `EXE_TLT_OP) ||
+							(aluop_i == `EXE_TLTI_OP) ||
+							(aluop_i == `EXE_TGE_OP) ||
+							(aluop_i == `EXE_TGEI_OP)) 
 						  ? // signed compare
 							((reg1_i[31] && !reg2_i[31]) ||
 							 (!reg1_i[31] && !reg2_i[31] && result_sum[31]) ||
@@ -163,6 +181,27 @@ module ex(
 		// determine memory address from 32-bit inst: reg1 + signedExt(15:0)
 	assign reg2_o = reg2_i;
 		// it saves to store value or to partly-fill value
+	assign inst_o = inst_i;
+		// send inst to MEM for determining whether is null
+		
+	// interrupt
+	reg trapassert;
+		// trap
+	reg ovassert;
+		// overflow
+	
+		// excepttype records type of interrupt
+		// [0-7] : for external interrupt
+		// [8] : syscall
+		// [9] : invalid instruction
+		// [10]: trap
+		// [11]: overflow
+		// [12]: eret ( which viewed as a special exception)
+	assign excepttype_o = {excepttype_i[31:12], ovassert, trapassert, excepttype_i[9:8], 8'h00};
+	
+	assign is_in_delayslot_o = is_in_delayslot_i;
+	
+	assign current_inst_address_o = current_inst_address_i;
 		
 	/* logic operation */
 	always @(*)
@@ -241,16 +280,16 @@ module ex(
 					moveRes <= reg1_i;
 				end
 				`EXE_MFC0_OP: begin
-					cp0_reg_read_addr_o <= inst_i[15:11];
+					cp0_reg_read_addr_o <= {inst_i[15:11], inst_i[2:0]};
 					moveRes <= cp0_reg_data_i;
 					
 					if (mem_cp0_reg_we == `WriteEnable && 
-						mem_cp0_reg_write_addr == inst_i[15:11])
+						mem_cp0_reg_write_addr == {inst_i[15:11], inst_i[2:0]})
 					begin
 						moveRes <= mem_cp0_reg_data;
 					end else
 					if (wb_cp0_reg_we == `WriteEnable &&
-						wb_cp0_reg_write_addr == inst_i[15:11])
+						wb_cp0_reg_write_addr == {inst_i[15:11], inst_i[2:0]})
 					begin
 						moveRes <= wb_cp0_reg_data;
 					end
@@ -348,6 +387,7 @@ module ex(
 	end
 	
 	/* choose one as final result according to alusel_i(type of ALU) */
+	// wreg will probably changed only here
 	always @(*)
 	begin
 		wd_o <= wd_i;
@@ -357,9 +397,11 @@ module ex(
 		begin
 			// overflow handling
 			wreg_o <= `WriteDisable;
+			ovassert <= 1'b1;
 		end else
 		begin
 			wreg_o <= wreg_i;
+			ovassert <= 1'b0;
 		end
 		
 		case (alusel_i)
@@ -588,20 +630,65 @@ module ex(
 	begin
 		if (rst == `RstEnable)
 		begin
-			cp0_reg_write_addr_o <= 5'b00000;
+			cp0_reg_write_addr_o <= 8'b00000000;
 			cp0_reg_we_o <= `WriteDisable;
 			cp0_reg_data_o <= `ZeroWord;
 		end else
 		if (aluop_i == `EXE_MTC0_OP)
 		begin
-			cp0_reg_write_addr_o <= inst_i[15:11];
+			cp0_reg_write_addr_o <= {inst_i[15:11], inst_i[2:0]};
 			cp0_reg_we_o <= `WriteEnable;
 			cp0_reg_data_o <= reg1_i;
 		end else
 		begin
-			cp0_reg_write_addr_o <= 5'b00000;
+			cp0_reg_write_addr_o <= 8'b00000000;
 			cp0_reg_we_o <= `WriteDisable;
 			cp0_reg_data_o <= `ZeroWord;
+		end
+	end
+	
+	/* handling trap */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			trapassert <= `TrapNotAssert;
+		end else
+		begin
+			trapassert <= `TrapNotAssert;
+			case (aluop_i)
+				// teq, teqi
+				`EXE_TEQ_OP, `EXE_TEQI_OP: begin
+					if (reg1_i == reg2_i)
+					begin
+						trapassert <= `TrapAssert;
+					end 
+				end
+				// tge, tgei, tgeiu, tgeu
+				`EXE_TGE_OP, `EXE_TGEI_OP, `EXE_TGEIU_OP, `EXE_TGEU_OP: begin
+					if (~reg1_lt_reg2)
+					begin
+						trapassert <= `TrapAssert;
+					end
+				end
+				// tlt, tlti, tltiu, tltu
+				`EXE_TLT_OP, `EXE_TLTI_OP, `EXE_TLTIU_OP, `EXE_TLTU_OP: begin
+					if (reg1_lt_reg2)
+					begin
+						trapassert <= `TrapAssert;
+					end
+				end
+				// tne, tnei
+				`EXE_TNE_OP, `EXE_TNEI_OP: begin
+					if (reg1_i != reg2_i)
+					begin
+						trapassert <= `TrapAssert;
+					end
+				end
+				default: begin
+					trapassert <= `TrapNotAssert;
+				end
+			endcase
 		end
 	end
 	
