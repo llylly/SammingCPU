@@ -41,9 +41,23 @@ module samming_cpu_test_sopc(
 
 );
 
-	wire[`InstAddrBus] inst_addr;
-	wire[`InstBus] inst;
-	wire rom_ce;
+	/** slow frequency as cpu clock **/
+	reg clk_1 = 1'b0, clk_2 = 1'b0, clk_3 = 1'b0, clk_4 = 1'b0;
+	
+	always @(posedge clk)
+	begin
+		clk_1 <= ~clk_1;
+	end
+	
+	always @(posedge clk_1)
+	begin
+		clk_2 <= ~clk_2;
+	end
+	
+	always @(posedge clk_2)
+	begin
+		clk_3 <= ~clk_3;
+	end
 	
 	wire[`RegBus] ram_data_i;
 	wire ram_ready_i;
@@ -52,6 +66,11 @@ module samming_cpu_test_sopc(
 	wire[3:0] ram_sel_o;
 	wire[`RegBus] ram_data_o;
 	wire ram_ce_o;
+	
+	wire[`RegBus] pc_ram_data_i;
+	wire pc_ram_ready_i;
+	wire[`InstAddrBus] pc_ram_o;
+	wire pc_ram_ce_o;
 	
 	`ifdef SIMULATE
 	wire[`RAMBus] base_ram_data;
@@ -81,12 +100,12 @@ module samming_cpu_test_sopc(
 	assign int_i = {5'b00000, timer_int};
 	
 	samming_cpu samming_cpu0(
-		.clk(clk), .rst(rst),
-		.rom_addr_o(inst_addr), .rom_data_i(inst),
-		.rom_ce_o(rom_ce),
+		.clk(clk_3), .rst(rst),
 		.ram_addr_o(ram_addr_o), .ram_we_o(ram_we_o),
 		.ram_sel_o(ram_sel_o), .ram_data_o(ram_data_o), .ram_ce_o(ram_ce_o),
+		.pc_ram_o(pc_ram_o), .pc_ram_ce_o(pc_ram_ce_o),
 		.ram_data_i(ram_data_i), .ram_ready_i(ram_ready_i),
+		.pc_ram_data_i(pc_ram_data_i), .pc_ram_ready_i(pc_ram_ready_i),
 		.int_i(int_i), .timer_int_o(timer_int),
 		.test_signal(test_signal)
 	);
@@ -97,16 +116,13 @@ module samming_cpu_test_sopc(
 		.ram_addr_i(ram_addr_o), .ram_we_i(ram_we_o),
 		.ram_sel_i(ram_sel_o), .ram_data_i(ram_data_o), .ram_ce_i(ram_ce_o),
 		.ram_data_o(ram_data_i), .ram_ready_o(ram_ready_i),
+		.pc_addr_i(pc_ram_o), .pc_ce_i(pc_ram_ce_o),
+		.pc_data_o(pc_ram_data_i), .pc_ready_o(pc_ram_ready_i),
 		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
 		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
 		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
 		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
 		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we)
-	);
-	
-	test_inst_rom test_inst_rom0(
-		.ce(rom_ce),
-		.addr(inst_addr), .inst(inst)
 	);
 
 

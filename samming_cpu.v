@@ -17,17 +17,13 @@ module samming_cpu(
 		// clock
 	input wire					rst,
 		// reset signal
-	
-	input wire[`InstBus]		rom_data_i,
-		// instruction get from RAM
-	output wire[`InstAddrBus]	rom_addr_o,
-		// address of instruction required
-	output wire					rom_ce_o,
-		// RAM enable signal
-
+		
 	// from RAM
 	input wire[`RegBus]			ram_data_i,
 	input wire					ram_ready_i,
+	
+	input wire[`RegBus]			pc_ram_data_i,
+	input wire					pc_ram_ready_i,
 	
 	// to RAM
 	output wire[`RegBus]		ram_addr_o,
@@ -39,6 +35,9 @@ module samming_cpu(
 	output wire[`RegBus]		ram_data_o,
 		// data to write to memory
 	output wire					ram_ce_o,
+	
+	output wire[`InstAddrBus]	pc_ram_o,
+	output wire					pc_ram_ce_o,
 	
 	// port of cp0
 	input wire[5:0]				int_i,
@@ -52,10 +51,13 @@ module samming_cpu(
 );
 
 	/* wire declaration */
-
-	// IF(pc_reg) <=> IF-ID
-	// 		another signal to send is inst, which is from rom_data_i
-	wire[`InstAddrBus] pc;
+	
+	// IF(pc-reg) <=> RAM
+	
+	
+	// IF(pc-reg) <=> IF-ID
+	wire[`InstAddrBus] pc_o;
+	wire[`InstBus] inst_o;
 
 	// IF-ID <=> ID
 	wire[`InstAddrBus] id_pc_i;
@@ -76,6 +78,8 @@ module samming_cpu(
 	wire[`RegBus] id_inst_o;
 	wire[`ExceptBus] id_excepttype_o;
 	wire[`RegBus] id_current_inst_address_o;
+	wire[1:0] id_mtc0_cnt_o;
+	wire[1:0] id_mtc0_cnt_i;
 	
 	// ID => PC
 	wire id_branch_flag_o;
@@ -183,6 +187,7 @@ module samming_cpu(
 	
 	// pipeline stall related
 	wire[5:0] stall;
+	wire stallreq_from_pc;
 	wire stallreq_from_id;
 	wire stallreq_from_ex;
 	wire stallreq_from_mem;
@@ -222,22 +227,23 @@ module samming_cpu(
 	/**** testing ****/
 	assign test_signal = wb_wdata_i;
 	
-	/* Link with instruction RAM */
-	assign rom_addr_o = pc;
-	
 	/* pc_reg instantiate */
 	pc_reg pc_reg0(
 		.clk(clk), .rst(rst), 
 		.flush(flush), .new_pc(new_pc),
-		.stall(stall), .pc(pc), .ce(rom_ce_o),
+		.stall(stall), 
 		.branch_flag_i(id_branch_flag_o), 
-		.branch_target_address_i(branch_target_address)
+		.branch_target_address_i(branch_target_address),
+		.pc(pc_ram_o), .ce(pc_ram_ce_o),
+		.pc_data_i(pc_ram_data_i), .pc_ready_i(pc_ram_ready_i),
+		.pc_o(pc_o), .inst_o(inst_o),
+		.stallreq(stallreq_from_pc)
 	);
 	
 	/* IF-ID instantiate */
 	if_id if_id0(
 		.clk(clk), .rst(rst), .stall(stall), .flush(flush),
-		.if_pc(pc), .if_inst(rom_data_i),
+		.if_pc(pc_o), .if_inst(inst_o),
 		.id_pc(id_pc_i), .id_inst(id_inst_i)
 	);
 	
@@ -272,6 +278,9 @@ module samming_cpu(
 		// pass inst to EX
 		.inst_o(id_inst_o),
 		
+		// mtc0 bubbles cnt
+		.mtc0_cnt_i(id_mtc0_cnt_i), .mtc0_cnt_o(id_mtc0_cnt_o),
+		
 		.stallreq(stallreq_from_id)
 	);
 	
@@ -302,6 +311,8 @@ module samming_cpu(
 		.ex_link_address(ex_link_address_i),
 		.ex_is_in_delayslot(ex_is_in_delayslot_i),
 		.is_in_delayslot_o(is_in_delayslot_i),
+		// mtc0 bubbles cnt
+		.mtc0_cnt_i(id_mtc0_cnt_o), .mtc0_cnt_o(id_mtc0_cnt_i),
 		// exception
 		.id_current_inst_address(id_current_inst_address_o), .id_excepttype(id_excepttype_o),
 		.ex_current_inst_address(ex_current_inst_address_i), .ex_excepttype(ex_excepttype_i)
@@ -331,12 +342,6 @@ module samming_cpu(
 		.is_in_delayslot_i(ex_is_in_delayslot_i),
 		// cp0
 		.cp0_reg_data_i(cp_data_o),
-		.wb_cp0_reg_data(wb_cp0_reg_data_i),
-		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
-		.wb_cp0_reg_we(wb_cp0_reg_we_i),
-		.mem_cp0_reg_data(mem_cp0_reg_data_o),
-		.mem_cp0_reg_write_addr(mem_cp0_reg_write_addr_o),
-		.mem_cp0_reg_we(mem_cp0_reg_we_o),
 		.cp0_reg_read_addr_o(ex_cp0_reg_read_addr_o),
 		.cp0_reg_data_o(ex_cp0_reg_data_o),
 		.cp0_reg_write_addr_o(ex_cp0_reg_write_addr_o),
@@ -401,9 +406,6 @@ module samming_cpu(
 		.current_inst_address_i(mem_current_inst_address_i),
 		.inst_i(mem_inst_i),
 		.cp0_status_i(cp0_status), .cp0_cause_i(cp0_cause), .cp0_epc_i(cp0_epc),
-		.wb_cp0_reg_we(wb_cp0_reg_we_i),
-		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
-		.wb_cp0_reg_data(wb_cp0_reg_data_i),
 		.excepttype_o(mem_excepttype_o),
 		.is_in_delayslot_o(mem_is_in_delayslot_o),
 		.current_inst_address_o(mem_current_inst_address_o),
@@ -473,6 +475,7 @@ module samming_cpu(
 	/* pipeline stall controller */
 	ctrl ctrl0(
 		.rst(rst), 
+		.stallreq_from_pc(stallreq_from_pc),
 		.stallreq_from_id(stallreq_from_id), 
 		.stallreq_from_ex(stallreq_from_ex),
 		.stallreq_from_mem(stallreq_from_mem),

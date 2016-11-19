@@ -29,43 +29,55 @@ module pc_reg(
 	input wire					branch_flag_i,
 	input wire[`RegBus]			branch_target_address_i,
 	
+	// to ram
 	output reg[`InstAddrBus]	pc,
-	output reg					ce
+	output reg					ce,
+	
+	// from ram
+	input wire[`RegBus]			pc_data_i,
+	input wire					pc_ready_i,
+	
+	// to if-id
+	output reg[`InstAddrBus]	pc_o,
+	output reg[`InstBus]		inst_o,
+	
+	output reg					stallreq
 );
-
-	always @(posedge clk)
-	begin
-		// when rst == 1, instruction RAM CE is set to 0
-		// Otherwise RAM CE set to 1
-		if (rst == `RstEnable) 
-		begin
-			ce <= `ChipDisable;
-		end else
-		begin
-			ce <= `ChipEnable;
-		end
-	end
 	
 	always @(posedge clk)
 	begin
-		if (ce == `ChipDisable)
+		if (rst == `RstEnable)
 		begin
 			pc <= 32'h00000000;
+			ce <= 1'b1;
 		end else 
 		if (stall[0] == `NoStop)
 		begin
 			if (flush == 1'b1) 
 			begin
 				pc <= new_pc;
+				ce <= 1'b1;
 			end else
 			if (branch_flag_i == `Branch)
 			begin
 				pc <= branch_target_address_i;
+				ce <= 1'b1;
 			end else
 			begin
 				pc <= pc + 4'h4;
+				ce <= 1'b1;
 			end
+		end else
+		begin
+			ce <= 1'b0;
 		end
+	end
+	
+	always @(*)
+	begin
+		stallreq <= ~pc_ready_i;
+		pc_o <= pc;
+		inst_o <= pc_data_i;
 	end
 
 endmodule

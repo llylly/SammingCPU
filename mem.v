@@ -93,11 +93,6 @@ module mem(
 	input wire[`RegBus]			cp0_cause_i,
 	input wire[`RegBus]			cp0_epc_i,
 	
-	// port from wb bypass
-	input wire					wb_cp0_reg_we,
-	input wire[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
-	input wire[`RegBus]			wb_cp0_reg_data,
-	
 	// port to cp0 (some also to ctrl)
 	output reg[`ExceptBus]		excepttype_o,
 		// final except type
@@ -684,18 +679,12 @@ module mem(
 	end
 	
 	/* read latest value of CP0 registers */
-	// NOTICE: bypass can be deleted after I add 3 bubbles once encountering mtc0
 	// status reg
 	always @(*)
 	begin
 		if (rst == `RstEnable)
 		begin
 			cp0_status <= `ZeroWord;
-		end else
-		if ((wb_cp0_reg_we == `WriteEnable) &&
-			(wb_cp0_reg_write_addr == `CP0_REG_STATUS))
-		begin
-			cp0_status <= wb_cp0_reg_data;
 		end else
 		begin
 			cp0_status <= cp0_status_i;
@@ -709,11 +698,6 @@ module mem(
 		begin
 			cp0_epc <= `ZeroWord;
 		end else
-		if ((wb_cp0_reg_we == `WriteEnable) &&
-			(wb_cp0_reg_write_addr == `CP0_REG_EPC))
-		begin
-			cp0_epc <= wb_cp0_reg_data;
-		end else
 		begin
 			cp0_epc <= cp0_epc_i;
 		end
@@ -726,11 +710,6 @@ module mem(
 		if (rst == `RstEnable)
 		begin
 			cp0_cause <= `ZeroWord;
-		end else
-		if ((wb_cp0_reg_we == `WriteEnable) &&
-			(wb_cp0_reg_write_addr == `CP0_REG_CAUSE))
-		begin
-			cp0_cause <= wb_cp0_reg_data;
 		end else
 		begin
 			cp0_cause <= cp0_cause_i;

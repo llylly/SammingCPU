@@ -46,6 +46,10 @@ module id_ex(
 	output reg					ex_is_in_delayslot,
 	output reg					is_in_delayslot_o,
 	
+	// mtc0 bubbles cnt
+	input wire[1:0]				mtc0_cnt_i,
+	output reg[1:0]				mtc0_cnt_o,
+	
 	// related to interrupt
 	input wire[`InstAddrBus]	id_current_inst_address,
 	input wire[`ExceptBus]		id_excepttype,
@@ -74,6 +78,8 @@ module id_ex(
 			
 			ex_excepttype <= `ZeroWord;
 			ex_current_inst_address <= `ZeroWord;
+			
+			mtc0_cnt_o <= 2'b00;
 		end else
 		if (flush == 1'b1)
 		begin
@@ -92,6 +98,8 @@ module id_ex(
 			
 			ex_excepttype <= `ZeroWord;
 			ex_current_inst_address <= `ZeroWord;
+			
+			mtc0_cnt_o <= 2'b00;
 		end else
 		if (stall[2] == `Stop && stall[3] == `NoStop)
 		begin
@@ -110,6 +118,8 @@ module id_ex(
 			
 			ex_excepttype <= `ZeroWord;
 			ex_current_inst_address <= `ZeroWord;
+			
+			mtc0_cnt_o <= mtc0_cnt_i;
 		end else
 		if (stall[2] == `NoStop)
 		begin
@@ -129,6 +139,8 @@ module id_ex(
 			
 			ex_excepttype <= id_excepttype;
 			ex_current_inst_address <= id_current_inst_address;
+			
+			mtc0_cnt_o <= 2'b00;
 		end
 	end
 

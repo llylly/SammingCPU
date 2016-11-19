@@ -21,21 +21,22 @@
 
 	NOTICE: 只是实现，尚未调试
 
-+ 串口 TODO
+
 + CP0 stage3 2016.11.18 llylly
 
-	WARNING!!!
+	气泡已加
 
-	MTC0会引起一堆数据冲突问题，掩码还要前推，count也有bug，因此以后要在译码到这个之后在ID后插3个气泡！
 
-+ MMU TODO
 + 异常处理 stage3 2016.11.19 llylly
 
 	添加了Ebase寄存器，用于作为启动异常向量地址寄存器
 
-+ WishBone TODO
++ MMU TODO
++ 串口 TODO
 + Flash TODO
 + UCore移植 TODO
 + UCore代码测试 TODO
++ 键盘
 + VGA显示 TODO
++ WishBone TODO
 + Decaf移植 TODO

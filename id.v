@@ -82,6 +82,10 @@ module id(
 	output wire[`ExceptBus]		excepttype_o,
 	output wire[`InstAddrBus]	current_inst_address_o,
 	
+	// mtc0 bubbles cnt
+	input wire[1:0]				mtc0_cnt_i,
+	output reg[1:0]				mtc0_cnt_o,
+	
 	// control signal for pipeline stall
 	output wire					stallreq
 
@@ -115,7 +119,9 @@ module id(
 		
 	reg stallreq_for_reg1_load_relate;
 	reg stallreq_for_reg2_load_relate;
+	reg stallreq_for_mtc0;
 	wire pre_inst_is_load;
+	wire pre_inst_is_mtc0;
 	
 	assign pre_inst_is_load =(	(ex_aluop_i == `EXE_LB_OP) ||
 								(ex_aluop_i == `EXE_LBU_OP) ||
@@ -126,6 +132,8 @@ module id(
 								(ex_aluop_i == `EXE_LWL_OP) ||
 								(ex_aluop_i == `EXE_LL_OP) ||
 								(ex_aluop_i == `EXE_SC_OP)) ? 1'b1 : 1'b0;
+	
+	assign pre_inst_is_mtc0 = (ex_aluop_i == `EXE_MTC0_OP);
 	
 	// interrupt handle 
 	reg excepttype_is_syscall;
@@ -1175,7 +1183,26 @@ module id(
 		end
 	end
 	
+	/* handle stall of mtc0 */
+	always @(*)
+	begin
+		if (pre_inst_is_mtc0)
+		begin
+			mtc0_cnt_o <= 2'b10;
+			stallreq_for_mtc0 <= 1'b1;
+		end else
+		if (mtc0_cnt_i != 2'b00)
+		begin
+			mtc0_cnt_o <= mtc0_cnt_i - 1;
+			stallreq_for_mtc0 <= 1'b1;
+		end else
+		begin
+			stallreq_for_mtc0 <= 1'b0;
+		end
+	end
+	
 	/* pipeline stall signal */
-	assign stallreq = stallreq_for_reg1_load_relate || stallreq_for_reg2_load_relate;
+	assign stallreq = stallreq_for_reg1_load_relate || stallreq_for_reg2_load_relate ||
+						stallreq_for_mtc0;
 
 endmodule

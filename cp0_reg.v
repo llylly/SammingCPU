@@ -254,6 +254,9 @@ module cp0_reg(
 				`CP0_REG_CONFIG: begin
 					data_o <= config_o;
 				end
+				`CP0_REG_EBASE: begin
+					data_o <= ebase_o;
+				end
 			endcase
 		end
 	end

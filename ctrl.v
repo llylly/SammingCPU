@@ -22,6 +22,8 @@
 
 module ctrl(
 	input wire 					rst,
+	input wire					stallreq_from_pc,
+		// pause request from pc_reg
 	input wire					stallreq_from_id,
 		// pause request from ID
 	input wire					stallreq_from_ex,
@@ -72,6 +74,11 @@ module ctrl(
 		if (stallreq_from_id == `Stop)
 		begin
 			stall <= 6'b000111;
+			flush <= 1'b0;
+		end else
+		if (stallreq_from_pc == `Stop)
+		begin
+			stall <= 6'b111111;
 			flush <= 1'b0;
 		end else
 		begin

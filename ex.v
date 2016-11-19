@@ -82,12 +82,6 @@ module ex(
 	
 	// input related to CP0
 	input wire[`RegBus]			cp0_reg_data_i,
-	input wire[`RegBus]			wb_cp0_reg_data,
-	input wire[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
-	input wire					wb_cp0_reg_we,
-	input wire[`RegBus]			mem_cp0_reg_data,
-	input wire[`CP0RegAddrBus]	mem_cp0_reg_write_addr,
-	input wire					mem_cp0_reg_we,
 	
 	// output to cp0
 	output reg[`CP0RegAddrBus]	cp0_reg_read_addr_o,
@@ -282,17 +276,6 @@ module ex(
 				`EXE_MFC0_OP: begin
 					cp0_reg_read_addr_o <= {inst_i[15:11], inst_i[2:0]};
 					moveRes <= cp0_reg_data_i;
-					
-					if (mem_cp0_reg_we == `WriteEnable && 
-						mem_cp0_reg_write_addr == {inst_i[15:11], inst_i[2:0]})
-					begin
-						moveRes <= mem_cp0_reg_data;
-					end else
-					if (wb_cp0_reg_we == `WriteEnable &&
-						wb_cp0_reg_write_addr == {inst_i[15:11], inst_i[2:0]})
-					begin
-						moveRes <= wb_cp0_reg_data;
-					end
 				end
 				default: begin
 				end

@@ -38,6 +38,8 @@ module test_ram(
 	
 	assign base_ram_data = base_ram_data_buf;
 	assign ext_ram_data = ext_ram_data_buf;
+	
+	initial $readmemh("I:\\CPU\\SammingCPU\\inst_rom.mem", base_data_mem);
 
 	always @ (posedge clk)
 	begin
