@@ -36,6 +36,10 @@ module ctrl(
 		// final exception type
 	input wire[`RegBus]			ebase_i,
 		// ebase used for exception entrance
+	input wire[`RegBus]			status_i,
+		// cp0 status
+	input wire[`RegBus]			cause_i,
+		// cp0 cause
 	output reg[5:0]				stall,
 		// output stall array
 	output reg[`RegBus]			new_pc,
@@ -55,11 +59,96 @@ module ctrl(
 		begin
 			flush <= 1'b1;
 			stall <= 6'b000000;
-			new_pc <= ebase_i;
-			if (excepttype_i == `ERET_EXP)
-			begin
-				new_pc <= cp0_epc_i;
-			end
+			
+			case (excepttype_i)
+			
+				/* testing */
+				`SYSCALL_EXP: begin
+					new_pc <= 32'h80000180;
+				end
+				/* end testing */
+			
+				`RESET_EXP: begin
+					new_pc <= 32'hBFC00000;
+				end
+				// TLB refill
+				`TLBL_EXP, `TLBS_EXP: begin
+					// BEV=0
+					if (status_i[22] == 1'b0)
+					begin
+						// EXL=0
+						if (status_i[1] == 1'b0)
+						begin
+							new_pc <= 32'h80000000;
+						end else
+						// EXL=1
+						if (status_i[1] == 1'b1)
+						begin
+							new_pc <= 32'h80000180;
+						end
+					end else
+					// BEV=1
+					if (status_i[22] == 1'b1)
+					begin
+						// EXL=0
+						if (status_i[1] == 1'b0)
+						begin
+							new_pc <= 32'hBFC00200;
+						end else
+						// EXL1
+						if (status_i[1] == 1'b1)
+						begin
+							new_pc <= 32'hBFC00380;
+						end
+					end
+				end
+				`INTERRUPT_EXP: begin
+					// BEV=0
+					if (status_i[22] == 1'b0)
+					begin
+						// IV=0
+						if (cause_i[23] == 1'b0)
+						begin
+							new_pc <= 32'h80000180;
+						end else
+						// IV=1
+						if (cause_i[23] == 1'b1)
+						begin
+							new_pc <= 32'h80000200;
+						end
+					end else
+					// BEV=1
+					if (status_i[22] == 1'b1)
+					begin
+						// IV=0
+						if (cause_i[23] == 1'b0)
+						begin
+							new_pc <= 32'hBFC00380;
+						end else
+						// IV=1
+						if (cause_i[23] == 1'b1)
+						begin
+							new_pc <= 32'hBFC00400;
+						end
+					end
+				end
+				`ERET_EXP: begin
+					new_pc <= cp0_epc_i;
+				end
+				default: begin
+					// BEV=0
+					if (status_i[22] == 1'b0)
+					begin
+						new_pc <= 32'h80000180;
+					end else
+					// BEV=1
+					if (status_i[22] == 1'b1)
+					begin
+						new_pc <= 32'hBFC00380;
+					end
+				end
+			endcase
+			
 		end else
 		if (stallreq_from_mem == `Stop)
 		begin

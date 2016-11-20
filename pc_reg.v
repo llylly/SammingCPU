@@ -36,13 +36,23 @@ module pc_reg(
 	// from ram
 	input wire[`RegBus]			pc_data_i,
 	input wire					pc_ready_i,
+	input wire					pc_tlbs_i,
+	input wire					pc_tlbl_i,
+	input wire					pc_mcheck_i,
 	
 	// to if-id
 	output reg[`InstAddrBus]	pc_o,
 	output reg[`InstBus]		inst_o,
 	
+	// exception
+	output wire[`ExceptBus]		excepttype_o,
+	
 	output reg					stallreq
 );
+
+	wire adel;
+	
+	assign adel = ~(pc[1:0] == 2'b00);
 	
 	always @(posedge clk)
 	begin
@@ -72,6 +82,8 @@ module pc_reg(
 			ce <= 1'b0;
 		end
 	end
+	
+	assign excepttype_o = {{9{1'b0}}, pc_mcheck_i, {5{1'b0}}, adel, pc_tlbs_i, pc_tlbl_i, {15{1'b0}}};
 	
 	always @(*)
 	begin

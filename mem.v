@@ -13,6 +13,9 @@
 
 `include "defines.v"
 
+//`define NO_RESET_EXCEPTION
+`define RESET_EXCEPTION
+
 module mem(
 	input wire					rst,
 	
@@ -59,6 +62,9 @@ module mem(
 	input wire[`RegBus]			mem_data_i,
 	input wire					mem_ready_i,
 		// EXTENSION for multiple clocks
+	input wire					mem_tlbl_i,
+	input wire					mem_tlbs_i,
+	input wire					mem_mod_i,
 	
 	// to external RAM stage
 	output reg[`RegBus]			mem_addr_o,
@@ -100,8 +106,19 @@ module mem(
 		// epc for CP0
 	output wire					is_in_delayslot_o,
 		// whether instruction in this stage is in delay slot
+	output reg[`RegBus]			badaddr_o,
+		// badaddr output
 	output wire[`RegBus]		current_inst_address_o,
 		// address of instruciton in this stage
+	
+	// port for tlb w/r
+	input wire					rtlb_i,
+	input wire					wtlb_i,
+	input wire					wtlb_addr_i,
+	
+	output reg					rtlb_o,
+	output reg					wtlb_o,
+	output reg					wtlb_addr_o,
 	
 	output reg					stallreq
 		// EXTENSION request for stall
@@ -124,6 +141,12 @@ module mem(
 	// these to be sent to CP0
 	assign is_in_delayslot_o = is_in_delayslot_i;
 	assign current_inst_address_o = current_inst_address_i;
+	
+	// exception
+	wire excepttype;
+	reg adel, ades;
+	reg tlbl, tlbs;
+	reg mod, mcheck;
 	
 	/* handling LLbit, which is used in LL/SC operations */
 	always @(*)
@@ -166,6 +189,17 @@ module mem(
 			cp0_reg_we_o <= `WriteDisable;
 			cp0_reg_write_addr_o <= 5'b00000;
 			cp0_reg_data_o <= `ZeroWord;
+			
+			rtlb_o <= `WriteDisable;
+			wtlb_o <= `WriteDisable;
+			wtlb_addr_o <= `FromIndex;
+			
+			adel <= 1'b0;
+			ades <= 1'b0;
+			tlbl <= 1'b0;
+			tlbs <= 1'b0;
+			mod <= 1'b0;
+			mcheck <= 1'b0;
 		end else
 		begin
 			wd_o <= wd_i;
@@ -187,6 +221,10 @@ module mem(
 			cp0_reg_we_o <= cp0_reg_we_i;
 			cp0_reg_write_addr_o <= cp0_reg_write_addr_i;
 			cp0_reg_data_o <= cp0_reg_data_i;
+			
+			rtlb_o <= rtlb_i;
+			wtlb_o <= wtlb_i;
+			wtlb_addr_o <= wtlb_addr_i;
 			
 			case (aluop_i)
 				`EXE_LB_OP: begin
@@ -716,25 +754,84 @@ module mem(
 		end
 	end
 	
+	/*
+		excepttype_o:
+		[0-7] : for external interrupt
+		[8] : syscall
+		[9] : invalid instruction
+		[10]: trap
+		[11]: overflow
+		[12]: eret (which viewed as a special exception)
+		[13]: reset
+		[14]: tlbmodify
+		[15]: inst-tlbl
+		[16]: inst-tlbs
+		[17]: inst-adel
+		[18]: 0
+		[19]: lw-tlbl
+		[20]: lw-tlbs
+		[21]: lw-adel
+		[22]: lw-ades
+		[23]: mcheck
+		// interrupt exception is given directly, besides from these codes
+		// watch is also
+	*/
+	
+	assign excepttype = {excepttype_i[31:24], mcheck || excepttype_i[23], ades, adel, tlbs, tlbl, excepttype_i[18:15], mod, excepttype_i[13:0]}; 
+	
 	/* give final exception type */
 	always @(*)
 	begin
 		if (rst == `RstEnable)
 		begin
-			excepttype_o <= `ZeroWord;
+			`ifdef NO_RESET_EXCEPTION
+				excepttype_o <= `ZeroWord;
+			`endif
+			`ifdef RESET_EXCEPTION
+				excepttype_o <= {{18{1'b0}}, 1'b1, {13{1'b0}}};
+			`endif
+			badaddr_o <= `ZeroWord;
 		end else
 		begin
 			excepttype_o <= `ZeroWord;
 			// not a null inst
 			if (inst_i != `ZeroWord)
 			begin
-				//interrupt
+				// reset
+				if (excepttype_i[13] == 1'b1)
+				begin
+					excepttype_o <= `RESET_EXP;
+				end else
+				// mcheck
+				if (excepttype_i[23] == 1'b1)
+				begin
+					excepttype_o <= `MCHECK_EXP;
+				end else
+				// interrupt
 				if (((cp0_cause[15:8] & (cp0_status[15:8])) != 8'h00) &&
+					(cp0_status[2] == 1'b0) &&
 					(cp0_status[1] == 1'b0) &&
 					(cp0_status[0] == 1'b1))
 				begin
 					excepttype_o <= `INTERRUPT_EXP;
 				end else
+				// inst-adel
+				if (excepttype_i[17] == 1'b1)
+				begin
+					excepttype_o <= `ADEL_EXP;
+				end else
+				// inst-tlbl
+				if (excepttype_i[15] == 1'b1)
+				begin
+					excepttype_o <= `TLBL_EXP;
+					badaddr_o <= current_inst_address_i;
+				end
+				// inst-tlbs
+				if (excepttype_i[16] == 1'b1)
+				begin
+					excepttype_o <= `TLBS_EXP;
+					badaddr_o <= current_inst_address_i;
+				end
 				// syscall
 				if (excepttype_i[8] == 1'b1)
 				begin
@@ -743,18 +840,49 @@ module mem(
 				// inst invalid
 				if (excepttype_i[9] == 1'b1)
 				begin
-					excepttype_o <= `INST_INVAL_EXP;
-				end else
-				// trap
-				if (excepttype_i[10] == 1'b1)
-				begin
-					excepttype_o <= `TRAP_EXP;
+					excepttype_o <= `RI_EXP;
 				end else
 				// overflow
 				if (excepttype_i[11] == 1'b1)
 				begin
 					excepttype_o <= `OVERFLOW_EXP;
 				end else
+				// trap
+				if (excepttype_i[10] == 1'b1)
+				begin
+					excepttype_o <= `TRAP_EXP;
+				end else
+				// lw-adel
+				if (excepttype_i[21] == 1'b1)
+				begin
+					excepttype_o <= `ADEL_EXP;
+					badaddr_o <= mem_data_o;
+				end else
+				// lw-ades
+				if (excepttype_i[22] == 1'b1)
+				begin
+					excepttype_o <= `ADES_EXP;
+					badaddr_o <= mem_data_o;
+				end else
+				// lw-tlbl
+				if (excepttype_i[19] == 1'b1)
+				begin
+					excepttype_o <= `TLBL_EXP;
+					badaddr_o <= mem_data_o;
+				end else
+				// lw-tlbs
+				if (excepttype_i[20] == 1'b1)
+				begin
+					excepttype_o <= `TLBS_EXP;
+					badaddr_o <= mem_data_o;
+				end else
+				// tlb-modify
+				if (excepttype_i[14] == 1'b1)
+				begin
+					excepttype_o <= `MOD_EXP;
+					badaddr_o <= mem_data_o;
+				end else
+				// eret
 				if (excepttype_i[12] == 1'b1)
 				begin
 					excepttype_o <= `ERET_EXP;

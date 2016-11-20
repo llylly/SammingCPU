@@ -65,7 +65,16 @@ module ex_mem(
 	
 	output reg[`ExceptBus]		mem_excepttype,
 	output reg[`InstAddrBus]	mem_current_inst_address,
-	output reg					mem_is_in_delayslot
+	output reg					mem_is_in_delayslot,
+	
+	// port for tlb
+	input wire					ex_rtlb,
+	input wire					ex_wtlb,
+	input wire					ex_wtlb_addr,
+	
+	output reg					mem_rtlb,
+	output reg					mem_wtlb,
+	output reg					mem_wtlb_addr
 );
 
 	always @(posedge clk)
@@ -96,6 +105,10 @@ module ex_mem(
 			mem_current_inst_address <= `ZeroWord;
 			
 			mem_inst_o <= `ZeroWord;
+			
+			mem_rtlb <= `WriteDisable;
+			mem_wtlb <= `WriteDisable;
+			mem_wtlb_addr <= `FromIndex;
 		end else
 		if (flush == 1'b1)
 		begin
@@ -122,6 +135,10 @@ module ex_mem(
 			mem_current_inst_address <= `ZeroWord;
 			
 			mem_inst_o <= `ZeroWord;
+			
+			mem_rtlb <= `WriteDisable;
+			mem_wtlb <= `WriteDisable;
+			mem_wtlb_addr <= `FromIndex;
 		end else
 		if (stall[3] == `Stop && stall[4] == `NoStop)
 		begin
@@ -149,6 +166,10 @@ module ex_mem(
 			mem_current_inst_address <= `ZeroWord;
 			
 			mem_inst_o <= `ZeroWord;
+			
+			mem_rtlb <= `WriteDisable;
+			mem_wtlb <= `WriteDisable;
+			mem_wtlb_addr <= `FromIndex;
 		end else
 		if (stall[3] == `NoStop)
 		begin
@@ -175,6 +196,10 @@ module ex_mem(
 			mem_current_inst_address <= ex_current_inst_address;
 			
 			mem_inst_o <= ex_inst_i;
+			
+			mem_rtlb <= ex_rtlb;
+			mem_wtlb <= ex_wtlb;
+			mem_wtlb_addr <= ex_wtlb_addr;
 		end else
 		begin
 			hilo_tmp_o <= hilo_tmp_i;

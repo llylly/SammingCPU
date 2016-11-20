@@ -78,7 +78,8 @@ module id(
 	// bypass from EX
 	input wire[`ALUOpBus]		ex_aluop_i,
 	
-	// interrupt output port
+	// interrupt port
+	input wire[`ExceptBus]		excepttype_i,
 	output wire[`ExceptBus]		excepttype_o,
 	output wire[`InstAddrBus]	current_inst_address_o,
 	
@@ -133,7 +134,7 @@ module id(
 								(ex_aluop_i == `EXE_LL_OP) ||
 								(ex_aluop_i == `EXE_SC_OP)) ? 1'b1 : 1'b0;
 	
-	assign pre_inst_is_mtc0 = (ex_aluop_i == `EXE_MTC0_OP);
+	assign pre_inst_is_mtc0 = (ex_aluop_i == `EXE_MTC0_OP) || (ex_aluop_i == `EXE_TLBR_OP);
 	
 	// interrupt handle 
 	reg excepttype_is_syscall;
@@ -146,7 +147,7 @@ module id(
 		// [8] : syscall
 		// [9] : invalid instruction
 		// [12]: eret ( which viewed as a special exception)
-	assign excepttype_o = {19'b0, excepttype_is_eret, 2'b0, instValid, excepttype_is_syscall, 8'b0};
+	assign excepttype_o = {excepttype_i[31:13], excepttype_is_eret, excepttype_i[11:10], instValid, excepttype_is_syscall, 8'b0};
 	
 	assign current_inst_address_o = pc_i;
 
@@ -1080,6 +1081,43 @@ module id(
 				reg2_read_o <= 1'b0;
 				instValid <= `InstValid;
 				excepttype_is_eret <= `TrueValue;
+			end
+			
+			if (inst_i == `EXE_TLBR)
+			begin
+				// tlbr
+				wreg_o <= `WriteDisable;
+				aluop_o <= `EXE_TLBR_OP;
+				alusel_o <= `EXE_RES_NOP;
+				reg1_read_o <= 1'b0;
+				reg2_read_o <= 1'b0;
+				instValid <= `InstValid;
+			end
+			if (inst_i == `EXE_TLBWI)
+			begin
+				// tlbwi
+				wreg_o <= `WriteDisable;
+				aluop_o <= `EXE_TLBWI_OP;
+				alusel_o <= `EXE_RES_NOP;
+				reg1_read_o <= 1'b0;
+				reg2_read_o <= 1'b0;
+				instValid <= `InstValid;
+			end
+			if (inst_i == `EXE_TLBWR)
+			begin
+				// tlbwr
+				wreg_o <= `WriteDisable;
+				aluop_o <= `EXE_TLBWR_OP;
+				alusel_o <= `EXE_RES_NOP;
+				reg1_read_o <= 1'b0;
+				reg2_read_o <= 1'b0;
+				instValid <= `InstValid;
+			end
+			
+			if (inst_i == `ZeroWord)
+			begin
+				// nop is a valid inst
+				instValid <= `InstValid;
 			end
 		end
 	end

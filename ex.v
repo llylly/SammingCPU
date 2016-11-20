@@ -98,6 +98,11 @@ module ex(
 	output wire[`ExceptBus]		excepttype_o,
 	output wire					is_in_delayslot_o,
 	
+	// output of whether write tlb
+	output reg					rtlb_o,
+	output reg					wtlb_o,
+	output reg					wtlb_addr_o,
+	
 	// control signal for pipeline stall
 	output reg					stallreq
 	
@@ -557,6 +562,42 @@ module ex(
 					end
 				end
 			endcase
+		end
+	end
+	
+	/* handling TLB write */
+	always @(*)
+	begin
+		if (rst == `RstEnable)
+		begin
+			rtlb_o <= `WriteDisable;
+			wtlb_o <= `WriteDisable;
+			wtlb_addr_o <= `FromIndex;
+		end else
+		begin
+			if (aluop_o == `EXE_TLBWI_OP)
+			begin
+				rtlb_o <= `WriteDisable;
+				wtlb_o <= `WriteEnable;
+				wtlb_addr_o <= `FromIndex;
+			end else
+			if (aluop_o == `EXE_TLBWR_OP)
+			begin
+				rtlb_o <= `WriteDisable;
+				wtlb_o <= `WriteEnable;
+				wtlb_addr_o <= `FromRandom;
+			end else
+			if (aluop_o == `EXE_TLBR_OP)
+			begin
+				rtlb_o <= `WriteEnable;
+				wtlb_o <= `WriteDisable;
+				wtlb_addr_o <= `FromIndex;
+			end else
+			begin
+				rtlb_o <= `WriteDisable;
+				wtlb_o <= `WriteDisable;
+				wtlb_addr_o <= `FromIndex;
+			end
 		end
 	end
 	

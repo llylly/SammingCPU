@@ -37,7 +37,6 @@ module samming_cpu(
 	output wire					ram_ce_o,
 	
 	output wire[`InstAddrBus]	pc_ram_o,
-	output wire					pc_ram_ce_o,
 	
 	// port of cp0
 	input wire[5:0]				int_i,
@@ -58,10 +57,12 @@ module samming_cpu(
 	// IF(pc-reg) <=> IF-ID
 	wire[`InstAddrBus] pc_o;
 	wire[`InstBus] inst_o;
+	wire[`ExceptBus] if_excepttype_o;
 
 	// IF-ID <=> ID
 	wire[`InstAddrBus] id_pc_i;
 	wire[`InstBus] id_inst_i;
+	wire[`ExceptBus] id_excepttype_i;
 	
 	// ID <=> ID-EX
 	wire[`ALUOpBus] id_aluop_o;
@@ -123,6 +124,9 @@ module samming_cpu(
 	wire[`ExceptBus] ex_excepttype_o;
 	wire[`RegBus] ex_current_inst_address_o;
 	wire ex_is_in_delayslot_o;
+	wire ex_rtlb_o;
+	wire ex_wtlb_o;
+	wire ex_wtlb_addr_o;
 	
 	// EX <=> CP0
 	wire[`CP0RegAddrBus] ex_cp0_reg_read_addr_o;
@@ -145,6 +149,9 @@ module samming_cpu(
 	wire[`ExceptBus] mem_excepttype_i;
 	wire mem_is_in_delayslot_i;
 	wire[`RegBus] mem_current_inst_address_i;
+	wire mem_rtlb_i;
+	wire mem_wtlb_i;
+	wire mem_wtlb_addr_i;
 	
 	// MEM <=> MEM-WB and MEM => ID(bypass)
 	wire mem_wreg_o;
@@ -158,10 +165,14 @@ module samming_cpu(
 	wire[`RegBus] mem_cp0_reg_data_o;
 	wire[`CP0RegAddrBus] mem_cp0_reg_write_addr_o;
 	wire mem_cp0_reg_we_o;
+	wire mem_rtlb_o;
+	wire mem_wtlb_o;
+	wire mem_wtlb_addr_o;
 	
 	// MEM => CP0 and MEM => CTRL
 	wire[`ExceptBus] mem_excepttype_o;
 	wire mem_is_in_delayslot_o;
+	wire[`RegBus] mem_badaddr_o;
 	wire[`RegBus] mem_current_inst_address_o;
 	wire[`RegBus] mem_cp0_epc_o;
 	
@@ -177,6 +188,9 @@ module samming_cpu(
 	wire[`RegBus] wb_cp0_reg_data_i;
 	wire[`CP0RegAddrBus] wb_cp0_reg_write_addr_i;
 	wire wb_cp0_reg_we_i;
+	wire wb_rtlb_i;
+	wire wb_wtlb_i;
+	wire wb_wtlb_addr_i;
 	
 	// WB(HI/LO) => EX
 	wire[`RegBus] hi;
@@ -234,17 +248,18 @@ module samming_cpu(
 		.stall(stall), 
 		.branch_flag_i(id_branch_flag_o), 
 		.branch_target_address_i(branch_target_address),
-		.pc(pc_ram_o), .ce(pc_ram_ce_o),
+		.pc(pc_ram_o),
 		.pc_data_i(pc_ram_data_i), .pc_ready_i(pc_ram_ready_i),
 		.pc_o(pc_o), .inst_o(inst_o),
+		.excepttype_o(if_excepttype_o),
 		.stallreq(stallreq_from_pc)
 	);
 	
 	/* IF-ID instantiate */
 	if_id if_id0(
 		.clk(clk), .rst(rst), .stall(stall), .flush(flush),
-		.if_pc(pc_o), .if_inst(inst_o),
-		.id_pc(id_pc_i), .id_inst(id_inst_i)
+		.if_pc(pc_o), .if_inst(inst_o), .if_excepttype(if_excepttype_o), 
+		.id_pc(id_pc_i), .id_inst(id_inst_i), .id_excepttype(id_excepttype_i)
 	);
 	
 	/* ID instantiate */
@@ -273,7 +288,7 @@ module samming_cpu(
 		.ex_aluop_i(ex_aluop_o),
 		
 		// exception
-		.excepttype_o(id_excepttype_o), .current_inst_address_o(id_current_inst_address_o),
+		.excepttype_i(id_excepttype_i), .excepttype_o(id_excepttype_o), .current_inst_address_o(id_current_inst_address_o),
 		
 		// pass inst to EX
 		.inst_o(id_inst_o),
@@ -350,6 +365,10 @@ module samming_cpu(
 		.current_inst_address_i(ex_current_inst_address_i), .excepttype_i(ex_excepttype_i),
 		.current_inst_address_o(ex_current_inst_address_o), .excepttype_o(ex_excepttype_o),
 		.is_in_delayslot_o(ex_is_in_delayslot_o),
+		// tlb
+		.rtlb_o(ex_rtlb_o),
+		.wtlb_o(ex_wtlb_o),
+		.wtlb_addr_o(ex_wtlb_addr_o),
 		.stallreq(stallreq_from_ex)
 	);
 
@@ -378,7 +397,14 @@ module samming_cpu(
 		.ex_is_in_delayslot(ex_is_in_delayslot_o),
 		.mem_excepttype(mem_excepttype_i),
 		.mem_current_inst_address(mem_current_inst_address_i),
-		.mem_is_in_delayslot(mem_is_in_delayslot_i)
+		.mem_is_in_delayslot(mem_is_in_delayslot_i),
+		// tlb
+		.ex_rtlb(ex_rtlb_o),
+		.ex_wtlb(ex_wtlb_o),
+		.ex_wtlb_addr(ex_wtlb_addr_o),
+		.mem_rtlb(mem_rtlb_i),
+		.mem_wtlb(mem_wtlb_i),
+		.mem_wtlb_addr(mem_wtlb_addr_i)
 	);
 	
 	mem mem0(
@@ -408,8 +434,16 @@ module samming_cpu(
 		.cp0_status_i(cp0_status), .cp0_cause_i(cp0_cause), .cp0_epc_i(cp0_epc),
 		.excepttype_o(mem_excepttype_o),
 		.is_in_delayslot_o(mem_is_in_delayslot_o),
+		.badaddr_o(mem_badaddr_o),
 		.current_inst_address_o(mem_current_inst_address_o),
 		.cp0_epc_o(mem_cp0_epc_o),
+		// tlb
+		.rtlb_i(mem_rtlb_i),
+		.wtlb_i(mem_wtlb_i),
+		.wtlb_addr_i(mem_wtlb_addr_i),
+		.rtlb_o(mem_rtlb_o),
+		.wtlb_o(mem_wtlb_o),
+		.wtlb_addr_o(mem_wtlb_addr_o),
 		.stallreq(stallreq_from_mem)
 	);
 	
@@ -428,7 +462,14 @@ module samming_cpu(
 		.wb_cp0_reg_data(wb_cp0_reg_data_i),
 		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
 		.wb_cp0_reg_we(wb_cp0_reg_we_i),
-		.cnt_i(mem_cnt_o), .cnt_o(mem_cnt_i)
+		.cnt_i(mem_cnt_o), .cnt_o(mem_cnt_i),
+		// tlb
+		.mem_rtlb(mem_rtlb_o),
+		.mem_wtlb(mem_wtlb_o),
+		.mem_wtlb_addr(mem_wtlb_addr_o),
+		.wb_rtlb(wb_rtlb_i),
+		.wb_wtlb(wb_wtlb_i),
+		.wb_wtlb_addr(wb_wtlb_addr_i)
 	);
 	
 	/* cp0 registers instantiate */
@@ -446,6 +487,7 @@ module samming_cpu(
 		.excepttype_i(mem_excepttype_o),
 		.current_inst_addr_i(mem_current_inst_address_o),
 		.is_in_delayslot_i(mem_is_in_delayslot_o),
+		.badaddr_i(mem_badaddr_o),
 		.timer_int_o(timer_int_o)
 	);
 	
@@ -483,7 +525,8 @@ module samming_cpu(
 		.cp0_epc_i(mem_cp0_epc_o),
 		.excepttype_i(mem_excepttype_o),
 		.ebase_i(cp0_ebase),
-		
+		.status_i(cp0_status),
+		.cause_i(cp0_cause),
 		.stall(stall),
 		.new_pc(new_pc),
 		.flush(flush)

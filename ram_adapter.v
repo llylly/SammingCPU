@@ -34,8 +34,6 @@ module ram_adapter(
 	
 	// from pc
 	input wire[`RegBus]			pc_addr_i,
-	input wire					pc_ce_i,
-		// it pushes ram to read new inst
 	
 	// to pc
 	output reg[`RegBus]			pc_data_o,

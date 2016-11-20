@@ -19,6 +19,10 @@ module samming_cpu_test_sopc(
 	input wire					clk,
 	input wire					rst,
 	
+	input wire					com1_in,
+	input wire 					com2_in,
+	input wire					keyboard_in,
+	
 	`ifdef REALITY
 	// from SRAM
 	inout wire[`RAMBus]			base_ram_data,
@@ -70,7 +74,6 @@ module samming_cpu_test_sopc(
 	wire[`RegBus] pc_ram_data_i;
 	wire pc_ram_ready_i;
 	wire[`InstAddrBus] pc_ram_o;
-	wire pc_ram_ce_o;
 	
 	`ifdef SIMULATE
 	wire[`RAMBus] base_ram_data;
@@ -97,13 +100,17 @@ module samming_cpu_test_sopc(
 	wire[5:0] int_i;
 	wire timer_int;
 	
-	assign int_i = {5'b00000, timer_int};
+	// int_i:   [0] - sysclock
+	//			[1] - keyboard
+	//			[3] - com2
+	//			[4] - com1
+	assign int_i = {1'b0, com1_in, com2_in, 1'b0, keyboard_in, timer_int};
 	
 	samming_cpu samming_cpu0(
 		.clk(clk_3), .rst(rst),
 		.ram_addr_o(ram_addr_o), .ram_we_o(ram_we_o),
 		.ram_sel_o(ram_sel_o), .ram_data_o(ram_data_o), .ram_ce_o(ram_ce_o),
-		.pc_ram_o(pc_ram_o), .pc_ram_ce_o(pc_ram_ce_o),
+		.pc_ram_o(pc_ram_o),
 		.ram_data_i(ram_data_i), .ram_ready_i(ram_ready_i),
 		.pc_ram_data_i(pc_ram_data_i), .pc_ram_ready_i(pc_ram_ready_i),
 		.int_i(int_i), .timer_int_o(timer_int),
@@ -116,7 +123,7 @@ module samming_cpu_test_sopc(
 		.ram_addr_i(ram_addr_o), .ram_we_i(ram_we_o),
 		.ram_sel_i(ram_sel_o), .ram_data_i(ram_data_o), .ram_ce_i(ram_ce_o),
 		.ram_data_o(ram_data_i), .ram_ready_o(ram_ready_i),
-		.pc_addr_i(pc_ram_o), .pc_ce_i(pc_ram_ce_o),
+		.pc_addr_i(pc_ram_o),
 		.pc_data_o(pc_ram_data_i), .pc_ready_o(pc_ram_ready_i),
 		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
 		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
