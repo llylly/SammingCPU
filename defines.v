@@ -265,8 +265,16 @@
 	// data width of SRAM
 `define RAMWrite_OP		1'b1
 `define RAMRead_OP		1'b0
-`define DataMemNum		4096
-`define DataWidth		11:0
+`define ROMBus			31:0
+`define ROMAddrBus		11:0
+`define FlashBus		15:0
+`define FlashAddrBus	23:0
+`define SerailAddrBus	2:0
+`define DataMemNum		524288
+`define DataWidth		18:0
+`define ROMNum			1024
+`define FlashNum		131072
+`define FlashSimuBus	18:2
 
 /*** macro define related to uniform registers (Regfile) ***/
 `define RegAddrBus		4:0
@@ -366,6 +374,7 @@
 `define ERET_EXP		32'h00000020
 
 /** TLB macro **/
+`define TLBNum			16
 `define TLBTotal		5'b10000
 `define TLBIndexMax		4'b1111
 `define TLBWidth		3:0
@@ -374,3 +383,17 @@
 `define ASIDWidth		7:0
 `define FromIndex		1'b0
 `define FromRandom		1'b1
+
+`define ItemWidth		78:0
+`define ItemTop			78
+`define ItemVPN2		77:59
+`define ItemG			58
+`define ItemASID		57:50
+`define ItemPFN0		49:30
+`define ItemC0			29:27
+`define ItemD0			26
+`define ItemV0			25
+`define ItemPFN1		24:5
+`define ItemC1			4:2
+`define ItemD1			1
+`define ItemV1			0

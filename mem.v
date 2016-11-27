@@ -13,9 +13,6 @@
 
 `include "defines.v"
 
-//`define NO_RESET_EXCEPTION
-`define RESET_EXCEPTION
-
 module mem(
 	input wire					rst,
 	
@@ -62,9 +59,6 @@ module mem(
 	input wire[`RegBus]			mem_data_i,
 	input wire					mem_ready_i,
 		// EXTENSION for multiple clocks
-	input wire					mem_tlbl_i,
-	input wire					mem_tlbs_i,
-	input wire					mem_mod_i,
 	
 	// to external RAM stage
 	output reg[`RegBus]			mem_addr_o,
@@ -120,8 +114,15 @@ module mem(
 	output reg					wtlb_o,
 	output reg					wtlb_addr_o,
 	
+	// port for record tlb exception
+	input wire					tlb_err_i,
+	input wire					tlb_mod_i,
+	input wire					tlb_mcheck_i,
+	
+	// bubble
+	input wire					mem_isbubble_i,
+	
 	output reg					stallreq
-		// EXTENSION request for stall
 );
 
 	wire[`RegBus] zero32;
@@ -143,10 +144,12 @@ module mem(
 	assign current_inst_address_o = current_inst_address_i;
 	
 	// exception
-	wire excepttype;
+	wire[`RegBus] excepttype;
 	reg adel, ades;
 	reg tlbl, tlbs;
-	reg mod, mcheck;
+	reg mod;
+	wire mcheck;
+	assign mcheck = tlb_mcheck_i;
 	
 	/* handling LLbit, which is used in LL/SC operations */
 	always @(*)
@@ -199,7 +202,6 @@ module mem(
 			tlbl <= 1'b0;
 			tlbs <= 1'b0;
 			mod <= 1'b0;
-			mcheck <= 1'b0;
 		end else
 		begin
 			wd_o <= wd_i;
@@ -222,6 +224,9 @@ module mem(
 			cp0_reg_write_addr_o <= cp0_reg_write_addr_i;
 			cp0_reg_data_o <= cp0_reg_data_i;
 			
+			adel <= 1'b0;
+			ades <= 1'b0;
+			
 			rtlb_o <= rtlb_i;
 			wtlb_o <= wtlb_i;
 			wtlb_addr_o <= wtlb_addr_i;
@@ -233,7 +238,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -241,6 +248,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -268,6 +279,7 @@ module mem(
 							wdata_o <= `ZeroWord;
 						end
 					endcase
+					
 				end
 				`EXE_LBU_OP: begin
 					if (cnt_i == 2'b00) 
@@ -275,7 +287,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -283,6 +297,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -317,7 +335,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -325,6 +345,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -342,8 +366,11 @@ module mem(
 						end
 						default: begin
 							wdata_o <= `ZeroWord;
+							adel <= 1'b1;
+							mem_ce <= `ChipDisable;
 						end
 					endcase
+					
 				end
 				`EXE_LHU_OP: begin
 					if (cnt_i == 2'b00) 
@@ -351,7 +378,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -359,6 +388,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -376,8 +409,11 @@ module mem(
 						end
 						default: begin
 							wdata_o <= `ZeroWord;
+							adel <= 1'b1;
+							mem_ce <= `ChipDisable;
 						end
 					endcase
+					
 				end
 				`EXE_LW_OP: begin
 					if (cnt_i == 2'b00) 
@@ -385,7 +421,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -393,6 +431,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -401,6 +443,12 @@ module mem(
 					mem_we <= `WriteDisable;
 					wdata_o <= mem_data_i;
 					mem_sel_o <= 4'b1111;
+					if (mem_addr_i[1:0] != 2'b00)
+					begin
+						adel <= 1'b1;
+						mem_ce <= `ChipDisable;
+					end
+					
 				end
 				`EXE_LWL_OP: begin
 					if (cnt_i == 2'b00) 
@@ -408,7 +456,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -416,6 +466,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -437,6 +491,7 @@ module mem(
 							wdata_o <= mem_data_i;
 						end
 					endcase
+					
 				end
 				`EXE_LWR_OP: begin
 					if (cnt_i == 2'b00) 
@@ -444,7 +499,9 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -452,6 +509,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -473,6 +534,7 @@ module mem(
 							wdata_o <= {reg2_i[31:8], mem_data_i[31:24]};
 						end
 					endcase
+					
 				end
 				`EXE_SB_OP: begin
 					if (cnt_i == 2'b00) 
@@ -480,7 +542,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbs <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -488,6 +553,14 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbs <= 1'b1;
+							end
+							if (tlb_mod_i == 1'b1)
+							begin
+								mod <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -512,6 +585,7 @@ module mem(
 							mem_sel_o <= 4'b0000;
 						end
 					endcase
+					
 				end
 				`EXE_SH_OP: begin
 					if (cnt_i == 2'b00) 
@@ -519,7 +593,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbs <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -527,6 +604,14 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbs <= 1'b1;
+							end
+							if (tlb_mod_i == 1'b1)
+							begin
+								mod <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -543,8 +628,11 @@ module mem(
 						end
 						default: begin
 							mem_sel_o <= 4'b0000;
+							ades <= 1'b1;
+							mem_ce <= `ChipDisable;
 						end
 					endcase
+					
 				end
 				`EXE_SW_OP: begin
 					if (cnt_i == 2'b00) 
@@ -552,7 +640,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbs <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -560,6 +651,14 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbs <= 1'b1;
+							end
+							if (tlb_mod_i == 1'b1)
+							begin
+								mod <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -568,6 +667,12 @@ module mem(
 					mem_we <= `WriteEnable;
 					mem_data_o <= reg2_i;
 					mem_sel_o <= 4'b1111;
+					if (mem_addr_i[1:0] != 2'b00)
+					begin
+						ades <= 1'b1;
+						mem_ce <= `ChipDisable;
+					end
+					
 				end
 				`EXE_SWL_OP: begin
 					if (cnt_i == 2'b00) 
@@ -575,7 +680,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbs <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -583,6 +691,14 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbs <= 1'b1;
+							end
+							if (tlb_mod_i == 1'b1)
+							begin
+								mod <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -610,6 +726,7 @@ module mem(
 							mem_sel_o <= 4'b0000;
 						end
 					endcase
+					
 				end
 				`EXE_SWR_OP: begin
 					if (cnt_i == 2'b00) 
@@ -617,7 +734,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbs <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -625,6 +745,14 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbs <= 1'b1;
+							end
+							if (tlb_mod_i == 1'b1)
+							begin
+								mod <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -652,6 +780,7 @@ module mem(
 							mem_sel_o <= 4'b0000;
 						end
 					endcase
+					
 				end
 				`EXE_LL_OP: begin
 					if (cnt_i == 2'b00) 
@@ -659,7 +788,10 @@ module mem(
 						if (mem_ready_i == 1'b1) 
 						begin
 							cnt_o <= 2'b01;
+							
 						end
+						tlbl <= 1'b0;
+						mod <= 1'b0;
 						stallreq <= 1'b1;
 						mem_ce <= `ChipEnable;
 					end else
@@ -667,6 +799,10 @@ module mem(
 						if (cnt_i == 2'b01)
 						begin
 							cnt_o <= 2'b10;
+							if (tlb_err_i == 1'b1)
+							begin
+								tlbl <= 1'b1;
+							end
 						end
 						stallreq <= 1'b0;
 						mem_ce <= `ChipDisable;
@@ -677,6 +813,12 @@ module mem(
 					mem_sel_o <= 4'b1111;
 					llbit_we_o <= 1'b1;
 					llbit_value_o <= 1'b1;
+					if (mem_addr_i[1:0] != 2'b00)
+					begin
+						adel <= 1'b1;
+						mem_ce <= `ChipDisable;
+					end
+					
 				end
 				`EXE_SC_OP: begin
 					if (llbit == 1'b1)
@@ -686,7 +828,10 @@ module mem(
 							if (mem_ready_i == 1'b1) 
 							begin
 								cnt_o <= 2'b01;
+								
 							end
+							tlbs <= 1'b0;
+							mod <= 1'b0;
 							stallreq <= 1'b1;
 							mem_ce <= `ChipEnable;
 						end else
@@ -694,6 +839,14 @@ module mem(
 							if (cnt_i == 2'b01)
 							begin
 								cnt_o <= 2'b10;
+								if (tlb_err_i == 1'b1)
+								begin
+									tlbs <= 1'b1;
+								end
+								if (tlb_mod_i == 1'b1)
+								begin
+									mod <= 1'b1;
+								end
 							end
 							stallreq <= 1'b0;
 							mem_ce <= `ChipDisable;
@@ -705,12 +858,21 @@ module mem(
 						llbit_we_o <= 1'b1;
 						llbit_value_o <= 1'b0;
 						wdata_o <= 32'b1;
+						if (mem_addr_i[1:0] != 2'b00)
+						begin
+							ades <= 1'b1;
+							mem_ce <= `ChipDisable;
+						end
+						
 					end else 
 					begin
 						wdata_o <= 32'b0;
 					end
 				end
 				default: begin
+					tlbl <= 1'b0;
+					tlbs <= 1'b0;
+					mod <= 1'b0;
 				end
 			endcase
 		end
@@ -765,7 +927,7 @@ module mem(
 		[13]: reset
 		[14]: tlbmodify
 		[15]: inst-tlbl
-		[16]: inst-tlbs
+		[16]: 0
 		[17]: inst-adel
 		[18]: 0
 		[19]: lw-tlbl
@@ -777,33 +939,23 @@ module mem(
 		// watch is also
 	*/
 	
-	assign excepttype = {excepttype_i[31:24], mcheck || excepttype_i[23], ades, adel, tlbs, tlbl, excepttype_i[18:15], mod, excepttype_i[13:0]}; 
+	assign excepttype = {excepttype_i[31:24], mcheck, ades, adel, tlbs, tlbl, excepttype_i[18:15], mod, excepttype_i[13:0]}; 
 	
 	/* give final exception type */
 	always @(*)
 	begin
 		if (rst == `RstEnable)
 		begin
-			`ifdef NO_RESET_EXCEPTION
-				excepttype_o <= `ZeroWord;
-			`endif
-			`ifdef RESET_EXCEPTION
-				excepttype_o <= {{18{1'b0}}, 1'b1, {13{1'b0}}};
-			`endif
+			excepttype_o <= {{18{1'b0}}, 1'b1, {13{1'b0}}};
 			badaddr_o <= `ZeroWord;
 		end else
 		begin
 			excepttype_o <= `ZeroWord;
 			// not a null inst
-			if (inst_i != `ZeroWord)
+			if (mem_isbubble_i == 1'b0)
 			begin
-				// reset
-				if (excepttype_i[13] == 1'b1)
-				begin
-					excepttype_o <= `RESET_EXP;
-				end else
 				// mcheck
-				if (excepttype_i[23] == 1'b1)
+				if (excepttype[23] == 1'b1)
 				begin
 					excepttype_o <= `MCHECK_EXP;
 				end else
@@ -816,74 +968,69 @@ module mem(
 					excepttype_o <= `INTERRUPT_EXP;
 				end else
 				// inst-adel
-				if (excepttype_i[17] == 1'b1)
+				if (excepttype[17] == 1'b1)
 				begin
 					excepttype_o <= `ADEL_EXP;
+					badaddr_o <= current_inst_address_i;
 				end else
 				// inst-tlbl
-				if (excepttype_i[15] == 1'b1)
+				if (excepttype[15] == 1'b1)
 				begin
 					excepttype_o <= `TLBL_EXP;
 					badaddr_o <= current_inst_address_i;
-				end
-				// inst-tlbs
-				if (excepttype_i[16] == 1'b1)
-				begin
-					excepttype_o <= `TLBS_EXP;
-					badaddr_o <= current_inst_address_i;
-				end
+				end else
 				// syscall
-				if (excepttype_i[8] == 1'b1)
+				if (excepttype[8] == 1'b1)
 				begin
 					excepttype_o <= `SYSCALL_EXP;
 				end else
 				// inst invalid
-				if (excepttype_i[9] == 1'b1)
+				if (excepttype[9] == 1'b1)
 				begin
 					excepttype_o <= `RI_EXP;
 				end else
 				// overflow
-				if (excepttype_i[11] == 1'b1)
+				if (excepttype[11] == 1'b1)
 				begin
 					excepttype_o <= `OVERFLOW_EXP;
 				end else
 				// trap
-				if (excepttype_i[10] == 1'b1)
+				if (excepttype[10] == 1'b1)
 				begin
 					excepttype_o <= `TRAP_EXP;
 				end else
 				// lw-adel
-				if (excepttype_i[21] == 1'b1)
+				if (excepttype[21] == 1'b1)
 				begin
 					excepttype_o <= `ADEL_EXP;
-					badaddr_o <= mem_data_o;
+					badaddr_o <= mem_addr_i;
 				end else
 				// lw-ades
-				if (excepttype_i[22] == 1'b1)
+				if (excepttype[22] == 1'b1)
 				begin
 					excepttype_o <= `ADES_EXP;
-					badaddr_o <= mem_data_o;
+					badaddr_o <= mem_addr_i;
 				end else
 				// lw-tlbl
-				if (excepttype_i[19] == 1'b1)
+				if (excepttype[19] == 1'b1)
 				begin
 					excepttype_o <= `TLBL_EXP;
-					badaddr_o <= mem_data_o;
+					badaddr_o <= mem_addr_i;
 				end else
 				// lw-tlbs
-				if (excepttype_i[20] == 1'b1)
+				if (excepttype[20] == 1'b1)
 				begin
 					excepttype_o <= `TLBS_EXP;
-					badaddr_o <= mem_data_o;
+					badaddr_o <= mem_addr_i;
 				end else
 				// tlb-modify
-				if (excepttype_i[14] == 1'b1)
+				if (excepttype[14] == 1'b1)
 				begin
 					excepttype_o <= `MOD_EXP;
-					badaddr_o <= mem_data_o;
+					badaddr_o <= mem_addr_i;
 				end else
 				// eret
-				if (excepttype_i[12] == 1'b1)
+				if (excepttype[12] == 1'b1)
 				begin
 					excepttype_o <= `ERET_EXP;
 				end
@@ -892,6 +1039,7 @@ module mem(
 	end
 	
 	/* forbid mem_ce signal once exception occurred to prevent data writing to RAM */
-	assign mem_ce_o = mem_ce & (~(|excepttype_o));
+	//assign mem_ce_o = mem_ce & (~(|excepttype_o));
+	assign mem_ce_o = mem_ce;
 
 endmodule

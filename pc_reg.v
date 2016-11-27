@@ -31,14 +31,13 @@ module pc_reg(
 	
 	// to ram
 	output reg[`InstAddrBus]	pc,
-	output reg					ce,
 	
 	// from ram
 	input wire[`RegBus]			pc_data_i,
 	input wire					pc_ready_i,
-	input wire					pc_tlbs_i,
-	input wire					pc_tlbl_i,
-	input wire					pc_mcheck_i,
+	
+	// port for record elb exception
+	input wire					tlb_err_i,
 	
 	// to if-id
 	output reg[`InstAddrBus]	pc_o,
@@ -47,6 +46,9 @@ module pc_reg(
 	// exception
 	output wire[`ExceptBus]		excepttype_o,
 	
+	// bubble
+	output wire					if_isbubble_o,
+	
 	output reg					stallreq
 );
 
@@ -54,36 +56,33 @@ module pc_reg(
 	
 	assign adel = ~(pc[1:0] == 2'b00);
 	
+	assign if_isbubble_o = 1'b0;
+	
 	always @(posedge clk)
 	begin
 		if (rst == `RstEnable)
 		begin
-			pc <= 32'h00000000;
-			ce <= 1'b1;
+			pc <= new_pc;
 		end else 
 		if (stall[0] == `NoStop)
 		begin
 			if (flush == 1'b1) 
 			begin
 				pc <= new_pc;
-				ce <= 1'b1;
 			end else
 			if (branch_flag_i == `Branch)
 			begin
 				pc <= branch_target_address_i;
-				ce <= 1'b1;
 			end else
 			begin
 				pc <= pc + 4'h4;
-				ce <= 1'b1;
 			end
 		end else
 		begin
-			ce <= 1'b0;
 		end
 	end
 	
-	assign excepttype_o = {{9{1'b0}}, pc_mcheck_i, {5{1'b0}}, adel, pc_tlbs_i, pc_tlbl_i, {15{1'b0}}};
+	assign excepttype_o = {{10{1'b0}}, {5{1'b0}}, adel, 1'b0, tlb_err_i, {15{1'b0}}};
 	
 	always @(*)
 	begin

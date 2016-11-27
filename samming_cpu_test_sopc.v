@@ -63,18 +63,12 @@ module samming_cpu_test_sopc(
 		clk_3 <= ~clk_3;
 	end
 	
-	wire[`RegBus] ram_data_i;
-	wire ram_ready_i;
-	wire[`RegBus] ram_addr_o;
-	wire ram_we_o;
-	wire[3:0] ram_sel_o;
-	wire[`RegBus] ram_data_o;
-	wire ram_ce_o;
+	always @(posedge clk_3)
+	begin
+		clk_4 <= ~clk_4;
+	end
 	
-	wire[`RegBus] pc_ram_data_i;
-	wire pc_ram_ready_i;
-	wire[`InstAddrBus] pc_ram_o;
-	
+	// SRAM simulator
 	`ifdef SIMULATE
 	wire[`RAMBus] base_ram_data;
 	wire[`RAMBus] ext_ram_data;
@@ -97,6 +91,52 @@ module samming_cpu_test_sopc(
 	);
 	`endif
 	
+	// ROM
+	wire[`ROMBus] rom_data_i;
+	wire rom_ready_i;
+	wire[`ROMAddrBus] rom_addr_o;
+	wire rom_we_o;
+	wire rom_ce_o;
+	
+	rom rom0(
+		.clk(clk), .rst(rst),
+		.rom_data_o(rom_data_i), .rom_ready_o(rom_ready_i),
+		.rom_addr_i(rom_addr_o), .rom_we_i(rom_we_o), .rom_ce_i(rom_ce_o)
+	);
+
+	// Flash
+	wire[`FlashBus] flash_data_i;
+	wire flash_ready_i;
+	wire[`FlashAddrBus] flash_addr_o;
+	wire flash_ce_o;
+	wire flash_we_o;
+	wire[`FlashBus] flash_data_o;
+	
+	`ifdef SIMULATE
+	test_flash test_flash0(
+		.clk(clk), .rst(rst),
+		.flash_data_o(flash_data_i), .flash_ready_o(flash_ready_i),
+		.flash_addr_i(flash_addr_o), .flash_ce_i(flash_ce_o), .flash_we_i(flash_we_o), .flash_data_i(flash_data_o)
+	);
+	`endif
+	
+	// Serail
+	wire[`RAMBus] serail_data_i;
+	wire serail_ready_i;
+	wire[`SerailAddrBus] serail_addr_o;
+	wire[`RAMBus] serail_data_o;
+	wire[`RAMBus] serail_we_o;
+	wire[`RAMBus] serail_ce_o;
+	
+	`ifdef SIMULATE
+	test_serail test_serail0(
+		.clk(clk), .rst(rst),
+		.serail_data_o(serail_data_i), .serail_ready_o(serail_ready_i),
+		.serail_addr_i(serail_addr_o), .serail_data_i(serail_data_o),
+		.serail_we_i(serail_we_o), .serail_ce_i(serail_ce_o)
+	);
+	`endif
+		
 	wire[5:0] int_i;
 	wire timer_int;
 	
@@ -105,31 +145,29 @@ module samming_cpu_test_sopc(
 	//			[3] - com2
 	//			[4] - com1
 	assign int_i = {1'b0, com1_in, com2_in, 1'b0, keyboard_in, timer_int};
+		// construct outer interrupt vector
 	
 	samming_cpu samming_cpu0(
-		.clk(clk_3), .rst(rst),
-		.ram_addr_o(ram_addr_o), .ram_we_o(ram_we_o),
-		.ram_sel_o(ram_sel_o), .ram_data_o(ram_data_o), .ram_ce_o(ram_ce_o),
-		.pc_ram_o(pc_ram_o),
-		.ram_data_i(ram_data_i), .ram_ready_i(ram_ready_i),
-		.pc_ram_data_i(pc_ram_data_i), .pc_ram_ready_i(pc_ram_ready_i),
+		.clk(clk_4), .busclk(clk), .rst(rst),
 		.int_i(int_i), .timer_int_o(timer_int),
-		.test_signal(test_signal)
-	);
-	
-	/* RAM adapter instantiate */
-	ram_adapter ram_adapter0(
-		.rst(rst), .clk(clk),
-		.ram_addr_i(ram_addr_o), .ram_we_i(ram_we_o),
-		.ram_sel_i(ram_sel_o), .ram_data_i(ram_data_o), .ram_ce_i(ram_ce_o),
-		.ram_data_o(ram_data_i), .ram_ready_o(ram_ready_i),
-		.pc_addr_i(pc_ram_o),
-		.pc_data_o(pc_ram_data_i), .pc_ready_o(pc_ram_ready_i),
+		// sram
 		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
 		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
 		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
 		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
-		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we)
+		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we),
+		// ROM
+		.rom_data_i(rom_data_i), .rom_ready_i(rom_ready_i),
+		.rom_addr_o(rom_addr_o), .rom_we_o(rom_we_o), .rom_ce_o(rom_ce_o),
+		// Flash
+		.flash_data_i(flash_data_i), .flash_ready_i(flash_ready_i),
+		.flash_addr_o(flash_addr_o), .flash_ce_o(flash_ce_o), .flash_we_o(flash_we_o), .flash_data_o(flash_data_o),
+		// Serail
+		.serail_data_i(serail_data_i), .serail_ready_i(serail_ready_i),
+		.serail_addr_o(serail_addr_o), .serail_data_o(serail_data_o),
+		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o),
+		
+		.test_signal(test_signal)
 	);
 
 

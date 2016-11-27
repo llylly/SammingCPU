@@ -15,28 +15,54 @@
 module samming_cpu(
 	input wire					clk,
 		// clock
+	input wire					busclk,
+		// busclock
 	input wire					rst,
 		// reset signal
-		
-	// from RAM
-	input wire[`RegBus]			ram_data_i,
-	input wire					ram_ready_i,
 	
-	input wire[`RegBus]			pc_ram_data_i,
-	input wire					pc_ram_ready_i,
+	// from/to sram
+	inout wire[`RAMBus]			base_ram_data,
+	inout wire[`RAMBus]			ext_ram_data,
 	
-	// to RAM
-	output wire[`RegBus]		ram_addr_o,
-		// output of RAM IO address
-	output wire					ram_we_o,
-		// output of whether to write memory
-	output wire[3:0]			ram_sel_o,
-		// byte selection signal
-	output wire[`RegBus]		ram_data_o,
-		// data to write to memory
-	output wire					ram_ce_o,
+	// to SRAM
+	output wire[`RAMAddrBus]	base_ram_addr,
+	output wire					base_ram_ce,
+	output wire					base_ram_oe,
+	output wire					base_ram_we,
 	
-	output wire[`InstAddrBus]	pc_ram_o,
+	output wire[`RAMAddrBus]	ext_ram_addr,
+	output wire					ext_ram_ce,
+	output wire					ext_ram_oe,
+	output wire					ext_ram_we,
+	
+	// from ROM
+	input wire[`ROMBus]			rom_data_i,
+	input wire					rom_ready_i,
+	
+	// to ROM
+	output wire[`ROMAddrBus]	rom_addr_o,
+	output wire					rom_we_o,
+	output wire					rom_ce_o,
+	
+	// from Flash
+	input wire[`FlashBus]		flash_data_i,
+	input wire					flash_ready_i,
+	
+	// to Flash
+	output wire[`FlashAddrBus]	flash_addr_o,
+	output wire					flash_ce_o,
+	output wire					flash_we_o,
+	output wire[`FlashBus]		flash_data_o,
+	
+	// from/to serail
+	input wire[`RAMBus]			serail_data_i,
+	input wire					serail_ready_i,
+	
+	// to Serial
+	output wire[`SerailAddrBus]	serail_addr_o,
+	output wire[`RAMBus]		serail_data_o,
+	output wire[`RAMBus]		serail_we_o,	
+	output wire[`RAMBus]		serail_ce_o,
 	
 	// port of cp0
 	input wire[5:0]				int_i,
@@ -58,11 +84,13 @@ module samming_cpu(
 	wire[`InstAddrBus] pc_o;
 	wire[`InstBus] inst_o;
 	wire[`ExceptBus] if_excepttype_o;
+	wire if_isbubble_o;
 
 	// IF-ID <=> ID
 	wire[`InstAddrBus] id_pc_i;
 	wire[`InstBus] id_inst_i;
 	wire[`ExceptBus] id_excepttype_i;
+	wire id_isbubble_i;
 	
 	// ID <=> ID-EX
 	wire[`ALUOpBus] id_aluop_o;
@@ -81,6 +109,7 @@ module samming_cpu(
 	wire[`RegBus] id_current_inst_address_o;
 	wire[1:0] id_mtc0_cnt_o;
 	wire[1:0] id_mtc0_cnt_i;
+	wire id_isbubble_o;
 	
 	// ID => PC
 	wire id_branch_flag_o;
@@ -106,6 +135,7 @@ module samming_cpu(
 	wire[`RegBus] ex_inst_i;
 	wire[`ExceptBus] ex_excepttype_i;
 	wire[`RegBus] ex_current_inst_address_i;
+	wire ex_isbubble_i;
 	
 	// EX <=> EX-MEM and EX => ID(bypass)
 	wire ex_wreg_o;
@@ -127,6 +157,7 @@ module samming_cpu(
 	wire ex_rtlb_o;
 	wire ex_wtlb_o;
 	wire ex_wtlb_addr_o;
+	wire ex_isbubble_o;
 	
 	// EX <=> CP0
 	wire[`CP0RegAddrBus] ex_cp0_reg_read_addr_o;
@@ -152,6 +183,7 @@ module samming_cpu(
 	wire mem_rtlb_i;
 	wire mem_wtlb_i;
 	wire mem_wtlb_addr_i;
+	wire mem_isbubble_i;
 	
 	// MEM <=> MEM-WB and MEM => ID(bypass)
 	wire mem_wreg_o;
@@ -188,9 +220,6 @@ module samming_cpu(
 	wire[`RegBus] wb_cp0_reg_data_i;
 	wire[`CP0RegAddrBus] wb_cp0_reg_write_addr_i;
 	wire wb_cp0_reg_we_i;
-	wire wb_rtlb_i;
-	wire wb_wtlb_i;
-	wire wb_wtlb_addr_i;
 	
 	// WB(HI/LO) => EX
 	wire[`RegBus] hi;
@@ -229,14 +258,64 @@ module samming_cpu(
 	wire[`RegBus] new_pc;
 	
 	// cp0 output
+	wire[`RegBus] cp0_index;
+	wire[`RegBus] cp0_random;
+	wire[`RegBus] cp0_entrylo0;
+	wire[`RegBus] cp0_entrylo1;
+	wire[`RegBus] cp0_wired;
+	wire[`RegBus] cp0_badvaddr;
 	wire[`RegBus] cp0_count;
+	wire[`RegBus] cp0_entryhi;
 	wire[`RegBus] cp0_compare;
 	wire[`RegBus] cp0_status;
 	wire[`RegBus] cp0_cause;
 	wire[`RegBus] cp0_epc;
-	wire[`RegBus] cp0_config;
 	wire[`RegBus] cp0_prid;
 	wire[`RegBus] cp0_ebase;
+	wire[`RegBus] cp0_config;
+	wire[`RegBus] cp0_watchlo;
+	wire[`RegBus] cp0_watchhi;
+	wire[`RegBus] cp0_errorepc;
+	
+	// memory
+	// from ram_adapter
+	wire[`RegBus] ram_data_i;
+	wire ram_ready_i;
+	wire[`RegBus] pc_ram_data_i;
+	wire pc_ram_ready_i;
+	
+	wire pc_tlb_err_i;
+	
+	wire ram_tlb_err_i;
+	wire ram_tlb_mod_i;
+	wire ram_tlb_mcheck_i;
+	// to ram_adapter
+	wire[`RegBus] ram_addr_o;
+	wire ram_we_o;
+	wire[3:0] ram_sel_o;
+	wire[`RegBus] ram_data_o;
+	wire ram_ce_o;
+	wire[`InstAddrBus] pc_ram_o;
+	
+	// ram_adapter <=> MMU
+	wire mmu_we_o;
+	wire mmu_ce_o;
+	wire[`RegBus] mmu_addr_o;
+	wire[`RAMBus] mmu_data_o;
+	
+	wire mmu_ready_i;
+	wire[`RAMBus] mmu_data_i;
+	
+	wire mmu_tlb_err_i;
+	wire mmu_mod_i;
+	
+	// MMU => CP0 for write TLB entry
+	wire tlb_we_o;
+	wire[`RegBus] tlb_w_entryhi_o;
+	wire[`RegBus] tlb_w_entrylo0_o;
+	wire[`RegBus] tlb_w_entrylo1_o;
+	
+	wire[`ASIDWidth] mmu_latest_asid_o;
 	
 	/**** testing ****/
 	assign test_signal = wb_wdata_i;
@@ -250,8 +329,10 @@ module samming_cpu(
 		.branch_target_address_i(branch_target_address),
 		.pc(pc_ram_o),
 		.pc_data_i(pc_ram_data_i), .pc_ready_i(pc_ram_ready_i),
+		.tlb_err_i(pc_tlb_err_i),
 		.pc_o(pc_o), .inst_o(inst_o),
 		.excepttype_o(if_excepttype_o),
+		.if_isbubble_o(if_isbubble_o),
 		.stallreq(stallreq_from_pc)
 	);
 	
@@ -259,7 +340,9 @@ module samming_cpu(
 	if_id if_id0(
 		.clk(clk), .rst(rst), .stall(stall), .flush(flush),
 		.if_pc(pc_o), .if_inst(inst_o), .if_excepttype(if_excepttype_o), 
-		.id_pc(id_pc_i), .id_inst(id_inst_i), .id_excepttype(id_excepttype_i)
+		.if_isbubble(if_isbubble_o),
+		.id_pc(id_pc_i), .id_inst(id_inst_i), .id_excepttype(id_excepttype_i),
+		.id_isbubble(id_isbubble_i)
 	);
 	
 	/* ID instantiate */
@@ -296,6 +379,9 @@ module samming_cpu(
 		// mtc0 bubbles cnt
 		.mtc0_cnt_i(id_mtc0_cnt_i), .mtc0_cnt_o(id_mtc0_cnt_o),
 		
+		// is bubble
+		.id_isbubble_i(id_isbubble_i), .id_isbubble_o(id_isbubble_o),
+		
 		.stallreq(stallreq_from_id)
 	);
 	
@@ -330,7 +416,9 @@ module samming_cpu(
 		.mtc0_cnt_i(id_mtc0_cnt_o), .mtc0_cnt_o(id_mtc0_cnt_i),
 		// exception
 		.id_current_inst_address(id_current_inst_address_o), .id_excepttype(id_excepttype_o),
-		.ex_current_inst_address(ex_current_inst_address_i), .ex_excepttype(ex_excepttype_i)
+		.ex_current_inst_address(ex_current_inst_address_i), .ex_excepttype(ex_excepttype_i),
+		// bubble
+		.id_isbubble(id_isbubble_o), .ex_isbubble(ex_isbubble_i)
 	);
 	
 	/* EX instantiate */
@@ -369,6 +457,8 @@ module samming_cpu(
 		.rtlb_o(ex_rtlb_o),
 		.wtlb_o(ex_wtlb_o),
 		.wtlb_addr_o(ex_wtlb_addr_o),
+		// bubble
+		.ex_isbubble_i(ex_isbubble_i), .ex_isbubble_o(ex_isbubble_o),
 		.stallreq(stallreq_from_ex)
 	);
 
@@ -404,7 +494,9 @@ module samming_cpu(
 		.ex_wtlb_addr(ex_wtlb_addr_o),
 		.mem_rtlb(mem_rtlb_i),
 		.mem_wtlb(mem_wtlb_i),
-		.mem_wtlb_addr(mem_wtlb_addr_i)
+		.mem_wtlb_addr(mem_wtlb_addr_i),
+		// bubble
+		.ex_isbubble(ex_isbubble_o), .mem_isbubble(mem_isbubble_i)
 	);
 	
 	mem mem0(
@@ -444,6 +536,11 @@ module samming_cpu(
 		.rtlb_o(mem_rtlb_o),
 		.wtlb_o(mem_wtlb_o),
 		.wtlb_addr_o(mem_wtlb_addr_o),
+		.tlb_err_i(ram_tlb_err_i),
+		.tlb_mod_i(ram_tlb_mod_i),
+		.tlb_mcheck_i(ram_tlb_mcheck_i),
+		// bubble
+		.mem_isbubble_i(mem_isbubble_i),
 		.stallreq(stallreq_from_mem)
 	);
 	
@@ -462,14 +559,7 @@ module samming_cpu(
 		.wb_cp0_reg_data(wb_cp0_reg_data_i),
 		.wb_cp0_reg_write_addr(wb_cp0_reg_write_addr_i),
 		.wb_cp0_reg_we(wb_cp0_reg_we_i),
-		.cnt_i(mem_cnt_o), .cnt_o(mem_cnt_i),
-		// tlb
-		.mem_rtlb(mem_rtlb_o),
-		.mem_wtlb(mem_wtlb_o),
-		.mem_wtlb_addr(mem_wtlb_addr_o),
-		.wb_rtlb(wb_rtlb_i),
-		.wb_wtlb(wb_wtlb_i),
-		.wb_wtlb_addr(wb_wtlb_addr_i)
+		.cnt_i(mem_cnt_o), .cnt_o(mem_cnt_i)
 	);
 	
 	/* cp0 registers instantiate */
@@ -479,15 +569,40 @@ module samming_cpu(
 		.raddr_i(ex_cp0_reg_read_addr_o), 
 		.int_i(int_i),
 		.data_o(cp_data_o),
-		.count_o(cp0_count), .compare_o(cp0_compare),
-		.status_o(cp0_status), .cause_o(cp0_cause),
-		.epc_o(cp0_epc), .config_o(cp0_config),
-		.prid_o(cp0_prid), .ebase_o(cp0_ebase),
+		
+		.index_o(cp0_index),
+		.random_o(cp0_random),
+		.entrylo0_o(cp0_entrylo0),
+		.entrylo1_o(cp0_entrylo1),
+		.wired_o(cp0_wired),
+		.badvaddr_o(cp0_badvaddr),
+		.count_o(cp0_count),
+		.entryhi_o(cp0_entryhi),
+		.compare_o(cp0_compare),
+		.status_o(cp0_status),
+		.cause_o(cp0_cause),
+		.epc_o(cp0_epc),
+		.prid_o(cp0_prid),
+		.ebase_o(cp0_ebase),
+		.config_o(cp0_config),
+		.watchlo_o(cp0_watchlo),
+		.watchhi_o(cp0_watchhi),
+		.errorepc_o(cp0_errorepc),
+		
 		// exception
 		.excepttype_i(mem_excepttype_o),
 		.current_inst_addr_i(mem_current_inst_address_o),
 		.is_in_delayslot_i(mem_is_in_delayslot_o),
 		.badaddr_i(mem_badaddr_o),
+		
+		.mmu_latest_asid_i(mmu_latest_asid_o),
+		
+		// mmu tlbr
+		.tlb_we_i(tlb_we_o),
+		.tlb_w_entryhi_i(tlb_w_entryhi_o),
+		.tlb_w_entrylo0_i(tlb_w_entrylo0_o),
+		.tlb_w_entrylo1_i(tlb_w_entrylo1_o),
+		
 		.timer_int_o(timer_int_o)
 	);
 	
@@ -530,6 +645,63 @@ module samming_cpu(
 		.stall(stall),
 		.new_pc(new_pc),
 		.flush(flush)
+	);
+	
+	/* RAM adapter instantiate */
+	ram_adapter ram_adapter0(
+		.rst(rst), .clk(busclk),
+		.ram_addr_i(ram_addr_o), .ram_we_i(ram_we_o),
+		.ram_sel_i(ram_sel_o), .ram_data_i(ram_data_o), .ram_ce_i(ram_ce_o),
+		.ram_data_o(ram_data_i), .ram_ready_o(ram_ready_i),
+		.ram_tlb_err_o(ram_tlb_err_i), .ram_tlb_mod_o(ram_tlb_mod_i),
+		.pc_addr_i(pc_ram_o),
+		.pc_data_o(pc_ram_data_i), .pc_ready_o(pc_ram_ready_i),
+		.pc_tlb_err_o(pc_tlb_err_i),
+		// MMU
+		.we_o(mmu_we_o), .ce_o(mmu_ce_o), .addr_o(mmu_addr_o), .data_o(mmu_data_o),
+		.ready_i(mmu_ready_i), .data_i(mmu_data_i),
+		.tlb_err_i(mmu_tlb_err_i), .mod_i(mmu_mod_i), .mcheck_i(mmu_mcheck_i)
+	);
+	
+	/* MMU instantiate */
+	mmu mmu0(
+		.rst(rst), .clk(busclk),
+		
+		.we_i(mmu_we_o), .ce_i(mmu_ce_o), .addr_i(mmu_addr_o), .data_i(mmu_data_o),
+		
+		.ready_o(mmu_ready_i), .data_o(mmu_data_i),
+		
+		.entryhi_i(cp0_entryhi), .entrylo0_i(cp0_entrylo0), .entrylo1_i(cp0_entrylo1),
+		.index_i(cp0_index), .random_i(cp0_random),
+		
+		.tlb_err_o(mmu_tlb_err_i), .mod_o(mmu_mod_i), .mcheck_o(ram_tlb_mcheck_i),
+		
+		.wtlb_i(mem_wtlb_o), .wtlb_addr_i(mem_wtlb_addr_o),
+		
+		.rtlb_i(mem_rtlb_o), .tlb_we_o(tlb_we_o), 
+		.tlb_w_entryhi_o(tlb_w_entryhi_o), .tlb_w_entrylo0_o(tlb_w_entrylo0_o), .tlb_w_entrylo1_o(tlb_w_entrylo1_o),
+		
+		.mmu_latest_asid_o(mmu_latest_asid_o),
+		
+		// SRAM ports
+		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
+		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
+		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
+		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
+		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we),
+		
+		// ROM ports
+		.rom_data_i(rom_data_i), .rom_ready_i(rom_ready_i),
+		.rom_addr_o(rom_addr_o), .rom_we_o(rom_we_o), .rom_ce_o(rom_ce_o),
+		
+		// Flash ports
+		.flash_data_i(flash_data_i), .flash_ready_i(flash_ready_i),
+		.flash_addr_o(flash_addr_o), .flash_ce_o(flash_ce_o), .flash_we_o(flash_we_o), .flash_data_o(flash_data_o),
+		
+		// Serail ports
+		.serail_data_i(serail_data_i), .serail_ready_i(serail_ready_i),
+		.serail_addr_o(serail_addr_o), .serail_data_o(serail_data_o),
+		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o)
 	);
 	
 endmodule

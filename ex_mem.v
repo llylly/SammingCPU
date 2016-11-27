@@ -74,7 +74,11 @@ module ex_mem(
 	
 	output reg					mem_rtlb,
 	output reg					mem_wtlb,
-	output reg					mem_wtlb_addr
+	output reg					mem_wtlb_addr,
+	
+	// bubble
+	input wire					ex_isbubble,
+	output reg					mem_isbubble
 );
 
 	always @(posedge clk)
@@ -109,6 +113,8 @@ module ex_mem(
 			mem_rtlb <= `WriteDisable;
 			mem_wtlb <= `WriteDisable;
 			mem_wtlb_addr <= `FromIndex;
+			
+			mem_isbubble <= 1'b0;
 		end else
 		if (flush == 1'b1)
 		begin
@@ -139,6 +145,8 @@ module ex_mem(
 			mem_rtlb <= `WriteDisable;
 			mem_wtlb <= `WriteDisable;
 			mem_wtlb_addr <= `FromIndex;
+			
+			mem_isbubble <= 1'b1;
 		end else
 		if (stall[3] == `Stop && stall[4] == `NoStop)
 		begin
@@ -170,6 +178,8 @@ module ex_mem(
 			mem_rtlb <= `WriteDisable;
 			mem_wtlb <= `WriteDisable;
 			mem_wtlb_addr <= `FromIndex;
+			
+			mem_isbubble <= 1'b1;
 		end else
 		if (stall[3] == `NoStop)
 		begin
@@ -200,6 +210,8 @@ module ex_mem(
 			mem_rtlb <= ex_rtlb;
 			mem_wtlb <= ex_wtlb;
 			mem_wtlb_addr <= ex_wtlb_addr;
+			
+			mem_isbubble <= ex_isbubble;
 		end else
 		begin
 			hilo_tmp_o <= hilo_tmp_i;

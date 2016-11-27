@@ -20,6 +20,9 @@
 
 `include "defines.v"
 
+`define InUcore
+//`define NotInUcore
+
 module ctrl(
 	input wire 					rst,
 	input wire					stallreq_from_pc,
@@ -54,23 +57,37 @@ module ctrl(
 		begin
 			stall <= 6'b000000;
 			flush <= 1'b0;
+			// RESET exception
+			`ifdef InUcore
+				//new_pc <= 32'hBFC00000;
+				new_pc <= 32'h80000000;
+			`endif
+			`ifdef NotInUcore
+				new_pc <= `ZeroWord;
+			`endif
 		end else
 		if (excepttype_i != `ZeroWord)
 		begin
 			flush <= 1'b1;
 			stall <= 6'b000000;
 			
+			`ifdef InUcore
 			case (excepttype_i)
 			
-				/* testing */
-				`SYSCALL_EXP: begin
-					new_pc <= 32'h80000180;
+				`ERET_EXP: begin
+					new_pc <= cp0_epc_i;
 				end
-				/* end testing */
+				
+				default: begin
+					new_pc <= ebase_i;
+				end
 			
-				`RESET_EXP: begin
-					new_pc <= 32'hBFC00000;
-				end
+			endcase
+			`endif
+			
+			`ifdef NotInUcore
+			case (excepttype_i)
+			
 				// TLB refill
 				`TLBL_EXP, `TLBS_EXP: begin
 					// BEV=0
@@ -102,6 +119,7 @@ module ctrl(
 						end
 					end
 				end
+				
 				`INTERRUPT_EXP: begin
 					// BEV=0
 					if (status_i[22] == 1'b0)
@@ -132,9 +150,11 @@ module ctrl(
 						end
 					end
 				end
+				
 				`ERET_EXP: begin
 					new_pc <= cp0_epc_i;
 				end
+				
 				default: begin
 					// BEV=0
 					if (status_i[22] == 1'b0)
@@ -148,7 +168,7 @@ module ctrl(
 					end
 				end
 			endcase
-			
+			`endif
 		end else
 		if (stallreq_from_mem == `Stop)
 		begin

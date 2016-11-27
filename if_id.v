@@ -22,11 +22,13 @@ module if_id(
 	input wire[`InstAddrBus]	if_pc,
 	input wire[`InstBus]		if_inst,
 	input wire[`ExceptBus]		if_excepttype,
+	input wire					if_isbubble,
 	
 	// singals to ID
 	output reg[`InstAddrBus]	id_pc,
 	output reg[`InstBus]		id_inst,
-	output reg[`ExceptBus]		id_excepttype
+	output reg[`ExceptBus]		id_excepttype,
+	output reg					id_isbubble
 );
 
 	always @(posedge clk) 
@@ -37,12 +39,14 @@ module if_id(
 			id_pc <= `ZeroWord;
 			id_inst <= `ZeroWord;
 			id_excepttype <= `ZeroWord;
+			id_isbubble <= 1'b0;
 		end else
 		if (flush == 1'b1) 
 		begin
 			id_pc <= `ZeroWord;
 			id_inst <= `ZeroWord;
 			id_excepttype <= `ZeroWord;
+			id_isbubble <= 1'b1;
 		end else
 		if (stall[1] == `Stop && stall[2] == `NoStop) 
 		begin
@@ -50,6 +54,7 @@ module if_id(
 			id_pc <= `ZeroWord;
 			id_inst <= `ZeroWord;
 			id_excepttype <= `ZeroWord;
+			id_isbubble <= 1'b1;
 		end else
 		if (stall[1] == `NoStop)
 		begin
@@ -57,6 +62,7 @@ module if_id(
 			id_pc <= if_pc;
 			id_inst <= if_inst;
 			id_excepttype <= if_excepttype;
+			id_isbubble <= if_isbubble;
 		end
 	end
 

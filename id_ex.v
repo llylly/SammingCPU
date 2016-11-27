@@ -55,7 +55,11 @@ module id_ex(
 	input wire[`ExceptBus]		id_excepttype,
 	
 	output reg[`InstAddrBus]	ex_current_inst_address,
-	output reg[`ExceptBus]		ex_excepttype
+	output reg[`ExceptBus]		ex_excepttype,
+	
+	// bubble
+	input wire					id_isbubble,
+	output reg					ex_isbubble
 );
 
 	always @(posedge clk)
@@ -80,6 +84,8 @@ module id_ex(
 			ex_current_inst_address <= `ZeroWord;
 			
 			mtc0_cnt_o <= 2'b00;
+			
+			ex_isbubble <= 1'b0;
 		end else
 		if (flush == 1'b1)
 		begin
@@ -100,6 +106,8 @@ module id_ex(
 			ex_current_inst_address <= `ZeroWord;
 			
 			mtc0_cnt_o <= 2'b00;
+			
+			ex_isbubble <= 1'b1;
 		end else
 		if (stall[2] == `Stop && stall[3] == `NoStop)
 		begin
@@ -120,6 +128,8 @@ module id_ex(
 			ex_current_inst_address <= `ZeroWord;
 			
 			mtc0_cnt_o <= mtc0_cnt_i;
+			
+			ex_isbubble <= 1'b1;
 		end else
 		if (stall[2] == `NoStop)
 		begin
@@ -141,6 +151,8 @@ module id_ex(
 			ex_current_inst_address <= id_current_inst_address;
 			
 			mtc0_cnt_o <= 2'b00;
+			
+			ex_isbubble <= id_isbubble;
 		end
 	end
 

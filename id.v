@@ -87,6 +87,10 @@ module id(
 	input wire[1:0]				mtc0_cnt_i,
 	output reg[1:0]				mtc0_cnt_o,
 	
+	// bubble
+	input wire					id_isbubble_i,
+	output wire					id_isbubble_o,
+	
 	// control signal for pipeline stall
 	output wire					stallreq
 
@@ -150,6 +154,8 @@ module id(
 	assign excepttype_o = {excepttype_i[31:13], excepttype_is_eret, excepttype_i[11:10], instValid, excepttype_is_syscall, 8'b0};
 	
 	assign current_inst_address_o = pc_i;
+	
+	assign id_isbubble_o = id_isbubble_i;
 
 	/* transcode instruction */
 	always @(*)

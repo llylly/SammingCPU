@@ -50,15 +50,6 @@ module mem_wb(
 	output reg[`CP0RegAddrBus]	wb_cp0_reg_write_addr,
 	output reg					wb_cp0_reg_we,
 	
-	// port for tlb
-	input wire					mem_rtlb,
-	input wire					mem_wtlb,
-	input wire					mem_wtlb_addr,
-	
-	output reg					wb_rtlb,
-	output reg					wb_wtlb,
-	output reg					wb_wtlb_addr,
-	
 	// port for MEM DFA
 	input wire[1:0]				cnt_i,
 		// EXTENSION for multiple MEM clocks
@@ -83,9 +74,6 @@ module mem_wb(
 			wb_cp0_reg_we <= `WriteDisable;
 			wb_cp0_reg_write_addr <= 5'b00000;
 			wb_cp0_reg_data <= `ZeroWord;
-			wb_rtlb <= `WriteDisable;
-			wb_wtlb <= `WriteDisable;
-			wb_wtlb_addr <= `FromIndex;
 		end else
 		if (flush == 1'b1)
 		begin
@@ -101,9 +89,6 @@ module mem_wb(
 			wb_cp0_reg_we <= `WriteDisable;
 			wb_cp0_reg_write_addr <= 5'b00000;
 			wb_cp0_reg_data <= `ZeroWord;
-			wb_rtlb <= `WriteDisable;
-			wb_wtlb <= `WriteDisable;
-			wb_wtlb_addr <= `FromIndex;
 		end else
 		if (stall[4] == `Stop && stall[5] == `NoStop)
 		begin
@@ -120,9 +105,6 @@ module mem_wb(
 			wb_cp0_reg_we <= `WriteDisable;
 			wb_cp0_reg_write_addr <= 5'b00000;
 			wb_cp0_reg_data <= `ZeroWord;
-			wb_rtlb <= `WriteDisable;
-			wb_wtlb <= `WriteDisable;
-			wb_wtlb_addr <= `FromIndex;
 		end else
 		if (stall[4] == `NoStop)
 		begin
@@ -138,9 +120,6 @@ module mem_wb(
 			wb_cp0_reg_we <= mem_cp0_reg_we;
 			wb_cp0_reg_write_addr <= mem_cp0_reg_write_addr;
 			wb_cp0_reg_data <= mem_cp0_reg_data;
-			wb_rtlb <= mem_rtlb;
-			wb_wtlb <= mem_wtlb;
-			wb_wtlb_addr <= mem_wtlb_addr;
 		end else
 		begin
 			cnt_o <= cnt_i;

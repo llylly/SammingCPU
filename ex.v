@@ -103,6 +103,10 @@ module ex(
 	output reg					wtlb_o,
 	output reg					wtlb_addr_o,
 	
+	// bubble
+	input wire					ex_isbubble_i,
+	output wire					ex_isbubble_o,
+	
 	// control signal for pipeline stall
 	output reg					stallreq
 	
@@ -201,6 +205,8 @@ module ex(
 	assign is_in_delayslot_o = is_in_delayslot_i;
 	
 	assign current_inst_address_o = current_inst_address_i;
+	
+	assign ex_isbubble_o = ex_isbubble_i;
 		
 	/* logic operation */
 	always @(*)

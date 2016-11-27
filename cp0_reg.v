@@ -75,8 +75,15 @@ module cp0_reg(
 	input wire					is_in_delayslot_i,
 	input wire[`RegBus]			badaddr_i,
 	
+	// for mmu
 	// mmu input
 	input wire[`ASIDWidth]		mmu_latest_asid_i,
+	
+	// mmu tlbr input
+	input wire					tlb_we_i,
+	input wire[`RegBus]			tlb_w_entryhi_i,
+	input wire[`RegBus]			tlb_w_entrylo0_i,
+	input wire[`RegBus]			tlb_w_entrylo1_i,
 	
 	output reg					timer_int_o
 		// whether timer interrupt happened
@@ -103,7 +110,7 @@ module cp0_reg(
 			
 			compare_o <= `ZeroWord;
 			
-			status_o <= 32'b00010000010000000000000000000000;
+			status_o <= 32'b00010000010000000000000000000010;
 			
 			cause_o <= `ZeroWord;
 			
@@ -143,6 +150,13 @@ module cp0_reg(
 			if (compare_o != `ZeroWord && count_o == compare_o)
 			begin
 				timer_int_o <= `InterruptAssert;
+			end
+			
+			if (tlb_we_i == `WriteEnable)
+			begin
+				entryhi_o <= tlb_w_entryhi_i;
+				entrylo0_o <= tlb_w_entrylo0_i;
+				entrylo1_o <= tlb_w_entrylo1_i;
 			end
 			
 			if (we_i == `WriteEnable)
