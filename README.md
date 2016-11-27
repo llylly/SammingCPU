@@ -31,7 +31,10 @@
 
 	添加了Ebase寄存器，用于作为启动异常向量地址寄存器
 
-+ MMU TODO
++ MMU stage4 2016.11.27 llylly
+
+	通过UCore仿真于2016.11.27
+
 + 串口 TODO
 + Flash TODO
 + UCore移植 TODO

@@ -91,6 +91,30 @@ module samming_cpu_test_sopc(
 	);
 	`endif
 	
+	// SRAM
+	wire ram_ready_i;
+	wire[`RAMBus] ram_data_i;
+	wire ram_we_o;
+	wire ram_ce_o;
+	wire[`RegBus] ram_addr_o;
+	wire[`RAMBus] ram_data_o;
+	wire[3:0] ram_sel_o;
+	
+	ram ram0(
+		.rst(rst), .clk(clk),
+		
+		.we_i(ram_we_o), .ce_i(ram_ce_o),
+		.addr_i(ram_addr_o), .data_i(ram_data_o), .sel_i(ram_sel_o),
+		
+		.ready_o(ram_ready_i), .data_o(ram_data_i),
+		
+		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
+		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
+		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
+		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
+		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we)
+	);
+	
 	// ROM
 	wire[`ROMBus] rom_data_i;
 	wire rom_ready_i;
@@ -151,11 +175,10 @@ module samming_cpu_test_sopc(
 		.clk(clk_4), .busclk(clk), .rst(rst),
 		.int_i(int_i), .timer_int_o(timer_int),
 		// sram
-		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
-		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
-		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
-		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
-		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we),
+		.sram_ready_i(ram_ready_i), .sram_data_i(ram_data_i),
+		.sram_we_o(ram_we_o), .sram_ce_o(ram_ce_o),
+		.sram_addr_o(ram_addr_o), .sram_data_o(ram_data_o),
+		.sram_sel_o(ram_sel_o),
 		// ROM
 		.rom_data_i(rom_data_i), .rom_ready_i(rom_ready_i),
 		.rom_addr_o(rom_addr_o), .rom_we_o(rom_we_o), .rom_ce_o(rom_ce_o),

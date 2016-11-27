@@ -24,6 +24,7 @@ module ram(
 		// module enable flag
 	input wire[`RegBus]			addr_i,
 	input wire[`RAMBus]			data_i,
+	input wire[3:0]				sel_i,
 	
 	// to upper module
 	output reg					ready_o,
@@ -54,6 +55,8 @@ module ram(
 	assign ext_ram_data = ext_ram_data_buf;
 	
 	reg data_ready;
+	
+	reg[`RAMBus] store_buf;
 	
 	always @(*)
 	begin
@@ -87,25 +90,121 @@ module ram(
 			ext_ram_data_buf <= 32'hZZZZZZZZ;
 			if (we_i == `RAMWrite_OP)
 			begin
-				if (addr_i[22] == 1'b0)
+				if (sel_i == 4'b1111)
 				begin
-					base_ram_addr <= addr_i[21:2];
-					base_ram_ce <= 1'b0;
-					base_ram_we <= 1'b0;
-					base_ram_oe <= 1'b1;
-					base_ram_data_buf <= data_i;
+					if (addr_i[22] == 1'b0)
+					begin
+						base_ram_addr <= addr_i[21:2];
+						base_ram_ce <= 1'b0;
+						base_ram_we <= 1'b0;
+						base_ram_oe <= 1'b1;
+						base_ram_data_buf <= data_i;
+					end else
+					if (addr_i[22] == 1'b1)
+					begin
+						ext_ram_addr <= addr_i[21:2];
+						ext_ram_ce <= 1'b0;
+						ext_ram_we <= 1'b0;
+						ext_ram_oe <= 1'b1;
+						ext_ram_data_buf <= data_i;
+					end
+					data_o <= `ZeroWord;
+					data_ready <= 1'b1;
 				end else
-				if (addr_i[22] == 1'b1)
+				if (sel_i == 4'b0000)
 				begin
-					ext_ram_addr <= addr_i[21:2];
-					ext_ram_ce <= 1'b0;
-					ext_ram_we <= 1'b0;
-					ext_ram_oe <= 1'b1;
-					ext_ram_data_buf <= data_i;
+					data_o <= `ZeroWord;
+					data_ready <= 1'b1;
+				end else
+				begin
+					case (cnt)
+						2'b00: begin
+							// read
+							if (addr_i[22] == 1'b0)
+							begin
+								base_ram_addr <= addr_i[21:2];
+								base_ram_ce <= 1'b0;
+								base_ram_we <= 1'b1;
+								base_ram_oe <= 1'b0;
+								base_ram_data_buf <= 32'hZZZZZZZZ;
+							end else
+							if (addr_i[22] == 1'b1)
+							begin
+								ext_ram_addr <= addr_i[21:2];
+								ext_ram_ce <= 1'b0;
+								ext_ram_we <= 1'b1;
+								ext_ram_oe <= 1'b0;
+								ext_ram_data_buf <= 32'hZZZZZZZZ;
+							end
+							cnt <= 2'b01;
+						end
+						2'b01: begin
+							// cal
+							if (sel_i[3] == 1'b1)
+							begin
+								store_buf[31:24] <= data_i[31:24];
+							end else
+							begin
+								if (addr_i[22] == 1'b0)
+									store_buf[31:24] <= base_ram_data[31:24];
+								else
+									store_buf[31:24] <= ext_ram_data[31:24];
+							end
+							if (sel_i[2] == 1'b1)
+							begin
+								store_buf[23:16] <= data_i[23:16];
+							end else
+							begin
+								if (addr_i[22] == 1'b0)
+									store_buf[23:16] <= base_ram_data[23:16];
+								else
+									store_buf[23:16] <= ext_ram_data[23:16];
+							end
+							if (sel_i[1] == 1'b1)
+							begin
+								store_buf[15:8] <= data_i[15:8];
+							end else
+							begin
+								if (addr_i[22] == 1'b0)
+									store_buf[15:8] <= base_ram_data[15:8];
+								else
+									store_buf[15:8] <= ext_ram_data[15:8];
+							end
+							if (sel_i[0] == 1'b1)
+							begin
+								store_buf[7:0] <= data_i[7:0];
+							end else
+							begin
+								if (addr_i[22] == 1'b0)
+									store_buf[7:0] <= base_ram_data[7:0];
+								else
+									store_buf[7:0] <= ext_ram_data[7:0];
+							end
+							cnt <= 2'b10;
+						end
+						2'b10: begin
+							// write
+							if (addr_i[22] == 1'b0)
+							begin
+								base_ram_addr <= addr_i[21:2];
+								base_ram_ce <= 1'b0;
+								base_ram_we <= 1'b0;
+								base_ram_oe <= 1'b1;
+								base_ram_data_buf <= store_buf;
+							end else
+							if (addr_i[22] == 1'b1)
+							begin
+								ext_ram_addr <= addr_i[21:2];
+								ext_ram_ce <= 1'b0;
+								ext_ram_we <= 1'b0;
+								ext_ram_oe <= 1'b1;
+								ext_ram_data_buf <= data_i;
+							end
+							data_o <= `ZeroWord;
+							data_ready <= 1'b1;
+						end
+					endcase
 				end
-				data_o <= `ZeroWord;
-				data_ready <= 1'b1;
-				cnt <= 2'b01;
 			end else
 			if (we_i == `RAMRead_OP)
 			begin

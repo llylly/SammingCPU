@@ -20,20 +20,18 @@ module samming_cpu(
 	input wire					rst,
 		// reset signal
 	
-	// from/to sram
-	inout wire[`RAMBus]			base_ram_data,
-	inout wire[`RAMBus]			ext_ram_data,
+	// from SRAM
+	input wire					sram_ready_i,
+	input wire[`RAMBus]			sram_data_i,
 	
 	// to SRAM
-	output wire[`RAMAddrBus]	base_ram_addr,
-	output wire					base_ram_ce,
-	output wire					base_ram_oe,
-	output wire					base_ram_we,
-	
-	output wire[`RAMAddrBus]	ext_ram_addr,
-	output wire					ext_ram_ce,
-	output wire					ext_ram_oe,
-	output wire					ext_ram_we,
+	output wire					sram_we_o,
+		// whether write RAM (otherwise read)
+	output wire					sram_ce_o,
+		// module enable flag
+	output wire[`RegBus]		sram_addr_o,
+	output wire[`RAMBus]		sram_data_o,
+	output wire[3:0]			sram_sel_o,
 	
 	// from ROM
 	input wire[`ROMBus]			rom_data_i,
@@ -302,6 +300,7 @@ module samming_cpu(
 	wire mmu_ce_o;
 	wire[`RegBus] mmu_addr_o;
 	wire[`RAMBus] mmu_data_o;
+	wire[3:0] mmu_sel_o;
 	
 	wire mmu_ready_i;
 	wire[`RAMBus] mmu_data_i;
@@ -658,7 +657,7 @@ module samming_cpu(
 		.pc_data_o(pc_ram_data_i), .pc_ready_o(pc_ram_ready_i),
 		.pc_tlb_err_o(pc_tlb_err_i),
 		// MMU
-		.we_o(mmu_we_o), .ce_o(mmu_ce_o), .addr_o(mmu_addr_o), .data_o(mmu_data_o),
+		.we_o(mmu_we_o), .ce_o(mmu_ce_o), .addr_o(mmu_addr_o), .data_o(mmu_data_o), .sel_o(mmu_sel_o),
 		.ready_i(mmu_ready_i), .data_i(mmu_data_i),
 		.tlb_err_i(mmu_tlb_err_i), .mod_i(mmu_mod_i), .mcheck_i(mmu_mcheck_i)
 	);
@@ -667,7 +666,7 @@ module samming_cpu(
 	mmu mmu0(
 		.rst(rst), .clk(busclk),
 		
-		.we_i(mmu_we_o), .ce_i(mmu_ce_o), .addr_i(mmu_addr_o), .data_i(mmu_data_o),
+		.we_i(mmu_we_o), .ce_i(mmu_ce_o), .addr_i(mmu_addr_o), .data_i(mmu_data_o), .sel_i(mmu_sel_o),
 		
 		.ready_o(mmu_ready_i), .data_o(mmu_data_i),
 		
@@ -683,12 +682,10 @@ module samming_cpu(
 		
 		.mmu_latest_asid_o(mmu_latest_asid_o),
 		
-		// SRAM ports
-		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
-		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
-		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
-		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
-		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we),
+		// SRAM
+		.ram_data_i(sram_data_i), .ram_ready_i(sram_ready_i),
+		.ram_we_o(sram_we_o), .ram_ce_o(sram_ce_o),
+		.ram_addr_o(sram_addr_o), .ram_data_o(sram_data_o), .ram_sel_o(sram_sel_o),
 		
 		// ROM ports
 		.rom_data_i(rom_data_i), .rom_ready_i(rom_ready_i),

@@ -24,6 +24,7 @@ module mmu(
 		// module enable flag
 	input wire[`RegBus]			addr_i,
 	input wire[`RAMBus]			data_i,
+	input wire[3:0]				sel_i,
 	
 	// out
 	output reg					ready_o,
@@ -55,20 +56,18 @@ module mmu(
 	// latest ASID to CP0 for saving
 	output reg[`ASIDWidth]		mmu_latest_asid_o,
 	
-	// base seg SRAM
-	inout wire[`RAMBus]			base_ram_data,
-	inout wire[`RAMBus]			ext_ram_data,
+	// from SRAM
+	input wire					ram_ready_i,
+	input wire[`RAMBus]			ram_data_i,
 	
-	// base seg SRAM
-	output wire[`RAMAddrBus]	base_ram_addr,
-	output wire					base_ram_ce,
-	output wire					base_ram_oe,
-	output wire					base_ram_we,
-	
-	output wire[`RAMAddrBus]	ext_ram_addr,
-	output wire					ext_ram_ce,
-	output wire					ext_ram_oe,
-	output wire					ext_ram_we,
+	// to SRAM
+	output reg					ram_we_o,
+		// whether write RAM (otherwise read)
+	output reg					ram_ce_o,
+		// module enable flag
+	output reg[`RegBus]			ram_addr_o,
+	output reg[`RAMBus]			ram_data_o,
+	output reg[3:0]				ram_sel_o,
 	
 	// from ROM
 	input wire[`ROMBus]			rom_data_i,
@@ -278,13 +277,6 @@ module mmu(
 	
 	reg[2:0] cnt;
 	
-	reg ram_we_i;
-	reg ram_ce_i;
-	reg[`RegBus] ram_addr_i;
-	reg[`RegBus] ram_data_i;
-	wire ram_ready_o;
-	wire[`RegBus] ram_data_o;
-	
 	reg[4:0] match;
 	reg[`RegBus] res_addr_i;
 	
@@ -294,10 +286,11 @@ module mmu(
 		begin
 			cnt <= 3'b000;
 			
-			ram_we_i <= 1'b0;
-			ram_ce_i <= 1'b0;
-			ram_addr_i <= `ZeroWord;
-			ram_data_i <= `ZeroWord;
+			ram_we_o <= 1'b0;
+			ram_ce_o <= 1'b0;
+			ram_addr_o <= `ZeroWord;
+			ram_data_o <= `ZeroWord;
+			ram_sel_o <= 4'b0000;
 			
 			rom_addr_o <= `ZeroWord;
 			rom_we_o <= 1'b0;
@@ -457,11 +450,12 @@ module mmu(
 						if (res_addr_i[31:28] == 16'h0)
 						begin
 							// SRAM
-							ram_we_i <= `RAMWrite_OP;
-							ram_ce_i <= 1'b1;
-							ram_addr_i <= res_addr_i;
-							ram_data_i <= data_i;
-							if (ram_ready_o == 1'b1)
+							ram_we_o <= `RAMWrite_OP;
+							ram_ce_o <= 1'b1;
+							ram_addr_o <= res_addr_i;
+							ram_data_o <= data_i;
+							ram_sel_o <= sel_i;
+							if (ram_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
 								cnt <= 3'b100;
@@ -515,14 +509,15 @@ module mmu(
 						if (res_addr_i[28] == 1'b0)
 						begin
 							// SRAM
-							ram_we_i <= `RAMRead_OP;
-							ram_ce_i <= 1'b1;
-							ram_addr_i <= res_addr_i;
-							if (ram_ready_o == 1'b1)
+							ram_we_o <= `RAMRead_OP;
+							ram_ce_o <= 1'b1;
+							ram_addr_o <= res_addr_i;
+							ram_sel_o <= sel_i;
+							if (ram_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
 								cnt <= 3'b100;
-								data_o <= ram_data_o;
+								data_o <= ram_data_i;
 							end
 						end else
 						if (res_addr_i[28:24] == 5'b11111)
@@ -574,8 +569,8 @@ module mmu(
 				
 				// restore and finish
 				3'b100: begin
-					ram_we_i <= `RAMRead_OP;
-					ram_ce_i <= 1'b0;
+					ram_we_o <= `RAMRead_OP;
+					ram_ce_o <= 1'b0;
 
 					rom_we_o <= 1'b0;
 					rom_ce_o <= 1'b0;
@@ -590,21 +585,5 @@ module mmu(
 			endcase
 		end
 	end
-	
-	ram ram0(
-		.rst(rst), .clk(clk),
-		
-		.we_i(ram_we_i), .ce_i(ram_ce_i), .addr_i(ram_addr_i), .data_i(ram_data_i),
-		
-		.ready_o(ram_ready_o), .data_o(ram_data_o),
-		
-		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
-		
-		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
-		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
-		
-		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
-		.ext_ram_oe(ext_ram_oe), .ext_ram_we(ext_ram_we)
-	);
 
 endmodule

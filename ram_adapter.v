@@ -51,6 +51,7 @@ module ram_adapter(
 	output reg					ce_o,
 	output reg[`RegBus]			addr_o,
 	output reg[`RAMBus]			data_o,
+	output reg[3:0]				sel_o,
 	
 	input wire					ready_i,
 	input wire[`RAMBus]			data_i,
@@ -96,19 +97,16 @@ module ram_adapter(
 				we_o <= `RAMRead_OP;
 				ce_o <= `ChipEnable;
 				addr_o <= pc_addr_i;
+				sel_o <= 4'b1111;
 				pc_ready <= 1'b0;
 				pc_tlb_err_o <= 1'b0;
 				if (ready_i == 1'b1)
 				begin
-					pc_cnt <= 2'b01;
+					ce_o <= `ChipDisable;
+					pc_data_o <= data_i;
+					pc_cnt <= 2'b10;
+					pc_tlb_err_o <= tlb_err_i;
 				end
-			end else
-			if (pc_cnt == 2'b01)
-			begin
-				ce_o <= `ChipDisable;
-				pc_data_o <= data_i;
-				pc_cnt <= 2'b10;
-				pc_tlb_err_o <= tlb_err_i;
 			end else
 			if (pc_cnt == 2'b10)
 			begin
@@ -131,79 +129,28 @@ module ram_adapter(
 				// when pc is not ready, load/store DFA will stuck in 00 state to wait
 				if (ram_we_i == 1'b1)
 				begin
-					// write operation:
-					// read - combile - write - wait or
-					// wait - write - wait
+					// write operation
 					if (cnt == 2'b00)
 					begin
+						we_o <= `RAMWrite_OP;
+						ce_o <= `ChipEnable;
+						addr_o <= ram_addr_i;
+						data_o <= ram_data_i;
+						sel_o <= ram_sel_i;
 						ram_ready_o <= 1'b0;
-						if (ram_sel_i == 4'b0000)
+						if (ready_i == 1'b1)
 						begin
-							cnt <= 2'b11;
-						end else
-						if (ram_sel_i == 4'b1111)
-						begin
-							data_o_tmp <= ram_data_i;
-							cnt <= 2'b10;
-						end else
-						begin
-							we_o <= `RAMRead_OP;
+							cnt <= 2'b01;
 							ce_o <= `ChipEnable;
-							addr_o <= ram_addr_i;
-							if (ready_i == 1'b1)
-							begin
-								ce_o <= `ChipDisable;
-								data_o_tmp <= data_i;
-								cnt <= 2'b01;
-							end else
-							begin
-								cnt <= 2'b00;
-							end
+							ram_data_o <= `ZeroWord;
+							ram_ready_o <= 1'b1;
+							ram_tlb_err_o <= tlb_err_i;
+							ram_tlb_mod_o <= mod_i;
 						end
 					end
 					if (cnt == 2'b01)
 					begin
 						
-						data_o_tmp <= data_i;
-						if (ram_sel_i[3] == 1'b1)
-						begin
-							data_o_tmp[31:24] <= ram_data_i[31:24];
-						end
-						if (ram_sel_i[2] == 1'b1)
-						begin
-							data_o_tmp[23:16] <= ram_data_i[23:16];
-						end
-						if (ram_sel_i[1] == 1'b1)
-						begin
-							data_o_tmp[15:8] <= ram_data_i[15:8];
-						end
-						if (ram_sel_i[0] == 1'b1)
-						begin
-							data_o_tmp[7:0] <= ram_data_i[7:0];
-						end
-						cnt <= 2'b10;
-					end
-					if (cnt == 2'b10)
-					begin
-						we_o <= `RAMWrite_OP;
-						ce_o <= `ChipEnable;
-						addr_o <= ram_addr_i;
-						data_o <= data_o_tmp;
-						if (ready_i == 1'b1)
-						begin
-							cnt <= 2'b11;
-						end else
-						begin
-							cnt <= 2'b10;
-						end
-					end
-					if (cnt == 2'b11)
-					begin
-						ce_o <= `ChipEnable;
-						ram_data_o <= `ZeroWord;
-						ram_ready_o <= 1'b1;
-						ram_tlb_err_o <= tlb_err_i;
-						ram_tlb_mod_o <= mod_i;
 					end
 				end else
 				if (ram_we_i == 1'b0)
@@ -214,22 +161,20 @@ module ram_adapter(
 						we_o <= `RAMRead_OP;
 						ce_o <= `ChipEnable;
 						addr_o <= ram_addr_i;
+						ram_ready_o <= 1'b0;
 						if (ready_i == 1'b1)
 						begin
 							cnt <= 2'b01;
-						end else
-						begin
-							cnt <= 2'b00;
+							ce_o <= `ChipEnable;
+							cnt <= 2'b10;
+							ram_data_o <= data_i;
+							ram_ready_o <= 1'b1;
+							ram_tlb_err_o <= tlb_err_i;
 						end
-						ram_ready_o <= 1'b0;
 					end
 					if (cnt == 2'b01)
 					begin
-						ce_o <= `ChipEnable;
-						cnt <= 2'b10;
-						ram_data_o <= data_i;
-						ram_ready_o <= 1'b1;
-						ram_tlb_err_o <= tlb_err_i;
+						
 					end
 				end	
 			end
