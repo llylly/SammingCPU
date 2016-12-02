@@ -35,11 +35,14 @@
 
 	通过UCore仿真于2016.11.27
 
-+ 串口 TODO
-+ Flash TODO
-+ UCore移植 TODO
-+ UCore代码测试 TODO
-+ 键盘
++ 串口 2016.11.29 llylly
++ Flash 2016.11.29 llylly
++ UCore移植 2016.12.3 llylly
++ UCore代码测试 2016.12.3 llylly
+
+	2016.12.3 成功上板并进入用户态
+
++ 键盘 TODO
 + VGA显示 TODO
 + WishBone TODO
 + Decaf移植 TODO

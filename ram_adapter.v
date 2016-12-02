@@ -102,9 +102,9 @@ module ram_adapter(
 				pc_tlb_err_o <= 1'b0;
 				if (ready_i == 1'b1)
 				begin
+					pc_cnt <= 2'b10;
 					ce_o <= `ChipDisable;
 					pc_data_o <= data_i;
-					pc_cnt <= 2'b10;
 					pc_tlb_err_o <= tlb_err_i;
 				end
 			end else
@@ -141,16 +141,14 @@ module ram_adapter(
 						if (ready_i == 1'b1)
 						begin
 							cnt <= 2'b01;
-							ce_o <= `ChipEnable;
 							ram_data_o <= `ZeroWord;
-							ram_ready_o <= 1'b1;
 							ram_tlb_err_o <= tlb_err_i;
 							ram_tlb_mod_o <= mod_i;
 						end
 					end
 					if (cnt == 2'b01)
 					begin
-						
+						ram_ready_o <= 1'b1;
 					end
 				end else
 				if (ram_we_i == 1'b0)
@@ -165,16 +163,13 @@ module ram_adapter(
 						if (ready_i == 1'b1)
 						begin
 							cnt <= 2'b01;
-							ce_o <= `ChipEnable;
-							cnt <= 2'b10;
 							ram_data_o <= data_i;
-							ram_ready_o <= 1'b1;
 							ram_tlb_err_o <= tlb_err_i;
 						end
 					end
 					if (cnt == 2'b01)
 					begin
-						
+						ram_ready_o <= 1'b1;
 					end
 				end	
 			end

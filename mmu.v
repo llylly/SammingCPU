@@ -87,6 +87,7 @@ module mmu(
 	output reg					flash_ce_o,
 	output reg					flash_we_o,
 	output reg[`FlashBus]		flash_data_o,
+	output reg[3:0]				flash_sel_o,
 	
 	// from/to serail
 	input wire[`RAMBus]			serail_data_i,
@@ -95,17 +96,9 @@ module mmu(
 	// to Serial
 	output reg[`SerailAddrBus]	serail_addr_o,
 	output reg[`RAMBus]			serail_data_o,
-	output reg[`RAMBus]			serail_we_o,	
-	output reg[`RAMBus]			serail_ce_o,
-	
-	// port of cp0
-	input wire[5:0]				int_i,
-		// hardware interrupt input
-	output wire					timer_int_o,
-		// timer interrupt output
-	
-	output wire[`RegBus]		test_signal
-		// used only for testing
+	output reg					serail_we_o,	
+	output reg					serail_ce_o,
+	output reg[3:0]				serail_sel_o
 );
 
 	reg[`ItemWidth] itemSet[0:`TLBNum - 1];
@@ -321,6 +314,8 @@ module mmu(
 					begin
 						res_addr_i <= {{3{1'b0}}, addr_i[28:0]};
 						cnt <= 3'b010;
+						tlb_err_o <= 1'b0;
+						mod_o <= 1'b0;
 					end else
 					begin
 						match = 5'b00000;
@@ -445,6 +440,10 @@ module mmu(
 				
 				// read/write and wait
 				3'b010: begin
+					/* debug */
+					//tlb_err_o <= 1'b0;
+					//mod_o <= 1'b0;
+					
 					if (we_i == `RAMWrite_OP)
 					begin
 						if (res_addr_i[31:28] == 16'h0)
@@ -478,8 +477,9 @@ module mmu(
 							// serail
 							serail_we_o <= 1'b1;
 							serail_ce_o <= 1'b1;
-							serail_addr_o <= {{2{1'b0}}, res_addr_i[3]};
+							serail_addr_o <= {{2{1'b0}}, res_addr_i[2]};
 							serail_data_o <= data_i;
+							serail_sel_o <= sel_i;
 							if (serail_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
@@ -491,8 +491,9 @@ module mmu(
 							// flash
 							flash_we_o <= 1'b1;
 							flash_ce_o <= 1'b1;
-							flash_addr_o <= res_addr_i[23:0];
+							flash_addr_o <= res_addr_i[`FlashAddrBus];
 							flash_data_o <= data_i[`FlashBus];
+							flash_sel_o <= sel_i;
 							if (flash_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
@@ -520,7 +521,7 @@ module mmu(
 								data_o <= ram_data_i;
 							end
 						end else
-						if (res_addr_i[28:24] == 5'b11111)
+						if (res_addr_i[31:12] == 20'h1FC00)
 						begin
 							// ROM
 							rom_we_o <= 1'b0;
@@ -533,12 +534,13 @@ module mmu(
 								data_o <= rom_data_i;
 							end
 						end else
-						if (res_addr_i == 32'h1FD003F8 || res_addr_i == 32'h1FD003FC)
+						if ((res_addr_i == 32'h1FD003F8) || (res_addr_i == 32'h1FD003FC))
 						begin
 							// serail
 							serail_we_o <= 1'b0;
 							serail_ce_o <= 1'b1;
-							serail_addr_o <= {{2{1'b0}}, res_addr_i[3]};
+							serail_addr_o <= {{2{1'b0}}, res_addr_i[2]};
+							serail_sel_o <= sel_i;
 							if (serail_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
@@ -551,7 +553,8 @@ module mmu(
 							// flash
 							flash_we_o <= 1'b0;
 							flash_ce_o <= 1'b1;
-							flash_addr_o <= res_addr_i[23:0];
+							flash_addr_o <= res_addr_i[`FlashAddrBus];
+							flash_sel_o <= sel_i;
 							if (flash_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;

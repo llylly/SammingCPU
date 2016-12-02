@@ -12,18 +12,20 @@
 
 `include "defines.v"
 
-`define SIMULATE
-//`define REALITY
+//`define SIMULATE
+`define REALITY
 
 module samming_cpu_test_sopc(
 	input wire					clk,
 	input wire					rst,
 	
-	input wire					com1_in,
-	input wire 					com2_in,
-	input wire					keyboard_in,
-	
 	`ifdef REALITY
+	// serial
+	output wire rxd,
+		// receive
+	input wire txd,
+		// send
+	
 	// from SRAM
 	inout wire[`RAMBus]			base_ram_data,
 	inout wire[`RAMBus]			ext_ram_data,
@@ -38,15 +40,28 @@ module samming_cpu_test_sopc(
 	output wire					ext_ram_ce,
 	output wire					ext_ram_oe,
 	output wire					ext_ram_we,
+	
+	// flash
+	output wire[`FlashAddrBus]	flash_addr_o,
+	inout wire[`FlashRealBus]	flash_data,
+	output wire					flash_byte_o,
+	output wire					flash_ce_o,
+	output wire					flash_ce1_o,
+	output wire					flash_ce2_o,
+	output wire					flash_oe_o,
+	output wire					flash_rp_o,
+	input wire					flash_sys_i,
+	output wire					flash_vpen_o,
+	output wire					flash_we_o,
 	`endif
 
-	output wire[`RegBus]		test_signal
+	output wire[`RegBus]		debug
 		// used only for testing
 
 );
 
 	/** slow frequency as cpu clock **/
-	reg clk_1 = 1'b0, clk_2 = 1'b0, clk_3 = 1'b0, clk_4 = 1'b0;
+	reg clk_1 = 1'b0, clk_2 = 1'b0, clk_3 = 1'b0, clk_4 = 1'b0, clk_5 = 1'b0;
 	
 	always @(posedge clk)
 	begin
@@ -66,6 +81,11 @@ module samming_cpu_test_sopc(
 	always @(posedge clk_3)
 	begin
 		clk_4 <= ~clk_4;
+	end
+	
+	always @(posedge clk_4)
+	begin
+		clk_5 <= ~clk_5;
 	end
 	
 	// SRAM simulator
@@ -92,21 +112,21 @@ module samming_cpu_test_sopc(
 	`endif
 	
 	// SRAM
-	wire ram_ready_i;
-	wire[`RAMBus] ram_data_i;
-	wire ram_we_o;
-	wire ram_ce_o;
-	wire[`RegBus] ram_addr_o;
-	wire[`RAMBus] ram_data_o;
-	wire[3:0] ram_sel_o;
+	wire sram_ready_i;
+	wire[`RAMBus] sram_data_i;
+	wire sram_we_o;
+	wire sram_ce_o;
+	wire[`RegBus] sram_addr_o;
+	wire[`RAMBus] sram_data_o;
+	wire[3:0] sram_sel_o;
 	
 	ram ram0(
 		.rst(rst), .clk(clk),
 		
-		.we_i(ram_we_o), .ce_i(ram_ce_o),
-		.addr_i(ram_addr_o), .data_i(ram_data_o), .sel_i(ram_sel_o),
+		.we_i(sram_we_o), .ce_i(sram_ce_o),
+		.addr_i(sram_addr_o), .data_i(sram_data_o), .sel_i(sram_sel_o),
 		
-		.ready_o(ram_ready_i), .data_o(ram_data_i),
+		.ready_o(sram_ready_i), .data_o(sram_data_i),
 		
 		.base_ram_data(base_ram_data), .ext_ram_data(ext_ram_data),
 		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
@@ -129,18 +149,33 @@ module samming_cpu_test_sopc(
 	);
 
 	// Flash
-	wire[`FlashBus] flash_data_i;
-	wire flash_ready_i;
-	wire[`FlashAddrBus] flash_addr_o;
-	wire flash_ce_o;
-	wire flash_we_o;
-	wire[`FlashBus] flash_data_o;
+	wire[`FlashBus] flashi_data_i;
+	wire flashi_ready_i;
+	wire[`FlashAddrBus] flashi_addr_o;
+	wire flashi_ce_o;
+	wire flashi_we_o;
+	wire[`FlashBus] flashi_data_o;
+	wire[3:0] flashi_sel_o;
 	
 	`ifdef SIMULATE
 	test_flash test_flash0(
 		.clk(clk), .rst(rst),
-		.flash_data_o(flash_data_i), .flash_ready_o(flash_ready_i),
-		.flash_addr_i(flash_addr_o), .flash_ce_i(flash_ce_o), .flash_we_i(flash_we_o), .flash_data_i(flash_data_o)
+		.flash_data_o(flashi_data_i), .flash_ready_o(flashi_ready_i),
+		.flash_addr_i(flashi_addr_o), .flash_ce_i(flashi_ce_o), .flash_we_i(flashi_we_o), .flash_data_i(flashi_data_o)
+	);
+	`endif
+	
+	`ifdef REALITY
+	flash flash0(
+		.clk(clk), .rst(rst),
+		
+		.data_o(flashi_data_i), .ready_o(flashi_ready_i),
+		.addr_i(flashi_addr_o), .ce_i(flashi_ce_o), .we_i(flashi_we_o), .data_i(flashi_data_o), .sel_i(flashi_sel_o),
+		
+		.flash_addr_o(flash_addr_o), .flash_data(flash_data), .flash_byte_o(flash_byte_o), 
+		.flash_ce_o(flash_ce_o), .flash_ce1_o(flash_ce1_o), .flash_ce2_o(flash_ce2_o),
+		.flash_oe_o(flash_oe_o), .flash_rp_o(flash_rp_o), .flash_sys_i(flash_sys_i),
+		.flash_vpen_o(flash_vpen_o), .flash_we_o(flash_we_o)
 	);
 	`endif
 	
@@ -149,8 +184,10 @@ module samming_cpu_test_sopc(
 	wire serail_ready_i;
 	wire[`SerailAddrBus] serail_addr_o;
 	wire[`RAMBus] serail_data_o;
-	wire[`RAMBus] serail_we_o;
-	wire[`RAMBus] serail_ce_o;
+	wire serail_we_o;
+	wire serail_ce_o;
+	wire[3:0] serail_sel_o;
+	wire readEnable;
 	
 	`ifdef SIMULATE
 	test_serail test_serail0(
@@ -158,6 +195,19 @@ module samming_cpu_test_sopc(
 		.serail_data_o(serail_data_i), .serail_ready_o(serail_ready_i),
 		.serail_addr_i(serail_addr_o), .serail_data_i(serail_data_o),
 		.serail_we_i(serail_we_o), .serail_ce_i(serail_ce_o)
+	);
+	`endif
+	
+	`ifdef REALITY
+	serail serail0(
+		.clk(clk), .rst(rst),
+		.rxd(rxd), .txd(txd),
+		
+		.data_o(serail_data_i), .ready_o(serail_ready_i),
+		.addr_i(serail_addr_o), .data_i(serail_data_o),
+		.we_i(serail_we_o), .ce_i(serail_ce_o), .sel_i(serail_sel_o),
+		
+		.readEnable(readEnable)
 	);
 	`endif
 		
@@ -168,30 +218,32 @@ module samming_cpu_test_sopc(
 	//			[1] - keyboard
 	//			[3] - com2
 	//			[4] - com1
-	assign int_i = {1'b0, com1_in, com2_in, 1'b0, keyboard_in, timer_int};
+	assign int_i = {timer_int, 1'b0, 1'b0, readEnable, 1'b0, 1'b0};
 		// construct outer interrupt vector
 	
 	samming_cpu samming_cpu0(
 		.clk(clk_4), .busclk(clk), .rst(rst),
 		.int_i(int_i), .timer_int_o(timer_int),
 		// sram
-		.sram_ready_i(ram_ready_i), .sram_data_i(ram_data_i),
-		.sram_we_o(ram_we_o), .sram_ce_o(ram_ce_o),
-		.sram_addr_o(ram_addr_o), .sram_data_o(ram_data_o),
-		.sram_sel_o(ram_sel_o),
+		.sram_ready_i(sram_ready_i), .sram_data_i(sram_data_i),
+		.sram_we_o(sram_we_o), .sram_ce_o(sram_ce_o),
+		.sram_addr_o(sram_addr_o), .sram_data_o(sram_data_o),
+		.sram_sel_o(sram_sel_o),
 		// ROM
 		.rom_data_i(rom_data_i), .rom_ready_i(rom_ready_i),
 		.rom_addr_o(rom_addr_o), .rom_we_o(rom_we_o), .rom_ce_o(rom_ce_o),
 		// Flash
-		.flash_data_i(flash_data_i), .flash_ready_i(flash_ready_i),
-		.flash_addr_o(flash_addr_o), .flash_ce_o(flash_ce_o), .flash_we_o(flash_we_o), .flash_data_o(flash_data_o),
+		.flash_data_i(flashi_data_i), .flash_ready_i(flashi_ready_i),
+		.flash_addr_o(flashi_addr_o), .flash_ce_o(flashi_ce_o), 
+		.flash_we_o(flashi_we_o), .flash_data_o(flashi_data_o),
+		.flash_sel_o(flashi_sel_o),
+		
 		// Serail
 		.serail_data_i(serail_data_i), .serail_ready_i(serail_ready_i),
 		.serail_addr_o(serail_addr_o), .serail_data_o(serail_data_o),
-		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o),
+		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o), .serail_sel_o(serail_sel_o),
 		
-		.test_signal(test_signal)
+		.debug(debug)
 	);
-
 
 endmodule

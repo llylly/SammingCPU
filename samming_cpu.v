@@ -51,6 +51,7 @@ module samming_cpu(
 	output wire					flash_ce_o,
 	output wire					flash_we_o,
 	output wire[`FlashBus]		flash_data_o,
+	output wire[3:0]			flash_sel_o,
 	
 	// from/to serail
 	input wire[`RAMBus]			serail_data_i,
@@ -59,8 +60,9 @@ module samming_cpu(
 	// to Serial
 	output wire[`SerailAddrBus]	serail_addr_o,
 	output wire[`RAMBus]		serail_data_o,
-	output wire[`RAMBus]		serail_we_o,	
-	output wire[`RAMBus]		serail_ce_o,
+	output wire					serail_we_o,	
+	output wire					serail_ce_o,
+	output wire[3:0]			serail_sel_o,
 	
 	// port of cp0
 	input wire[5:0]				int_i,
@@ -68,7 +70,7 @@ module samming_cpu(
 	output wire					timer_int_o,
 		// timer interrupt output
 	
-	output wire[`RegBus]		test_signal
+	output wire[`RegBus]		debug
 		// used only for testing
 
 );
@@ -317,7 +319,20 @@ module samming_cpu(
 	wire[`ASIDWidth] mmu_latest_asid_o;
 	
 	/**** testing ****/
-	assign test_signal = wb_wdata_i;
+	/*
+	always @(posedge clk)
+	begin
+		//debug <= {{2{1'b0}}, id_pc_i[31:2]};
+		if (rst == `RstEnable)
+		begin
+			debug <= `ZeroWord;
+		end else
+		begin
+			if (mem_excepttype_o != `ZeroWord)
+				debug <= debug | mem_excepttype_o;
+		end
+	end
+	*/
 	
 	/* pc_reg instantiate */
 	pc_reg pc_reg0(
@@ -540,7 +555,9 @@ module samming_cpu(
 		.tlb_mcheck_i(ram_tlb_mcheck_i),
 		// bubble
 		.mem_isbubble_i(mem_isbubble_i),
-		.stallreq(stallreq_from_mem)
+		.stallreq(stallreq_from_mem),
+		// debug
+		.debug(debug)
 	);
 	
 	/* MEM-WB instantiate */
@@ -694,11 +711,12 @@ module samming_cpu(
 		// Flash ports
 		.flash_data_i(flash_data_i), .flash_ready_i(flash_ready_i),
 		.flash_addr_o(flash_addr_o), .flash_ce_o(flash_ce_o), .flash_we_o(flash_we_o), .flash_data_o(flash_data_o),
+		.flash_sel_o(flash_sel_o),
 		
 		// Serail ports
 		.serail_data_i(serail_data_i), .serail_ready_i(serail_ready_i),
 		.serail_addr_o(serail_addr_o), .serail_data_o(serail_data_o),
-		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o)
+		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o), .serail_sel_o(serail_sel_o)
 	);
 	
 endmodule

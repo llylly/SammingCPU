@@ -16,9 +16,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 /*** global macro definition ***/
-`define RstEnable		1'b1
+`define RstEnable		1'b0
 	// reset enabled value
-`define RstDisable		1'b0
+`define RstDisable		1'b1
 	// reset disabled value
 `define ZeroWord		32'h00000000
 	// 32-bit zero
@@ -267,8 +267,9 @@
 `define RAMRead_OP		1'b0
 `define ROMBus			31:0
 `define ROMAddrBus		11:0
-`define FlashBus		15:0
-`define FlashAddrBus	23:0
+`define FlashBus		31:0
+`define FlashRealBus	15:0
+`define FlashAddrBus	22:0
 `define SerailAddrBus	2:0
 `define DataMemNum		524288
 `define DataWidth		18:0
@@ -397,3 +398,10 @@
 `define ItemC1			4:2
 `define ItemD1			1
 `define ItemV1			0
+
+/** serail macro **/
+`define clkCoef			6'd31
+`define repCoef			5'd14
+`define totCoef			10'd434
+
+

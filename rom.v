@@ -27,7 +27,7 @@ module rom(
 
 	reg[`ROMBus] romSet[0 : `ROMNum - 1];
 
-	initial $readmemh("I:\\CPU\\SammingCPU\\booter.mem", romSet);
+	initial $readmemh("rom.mem", romSet);
 
 	always @(posedge clk)
 	begin
@@ -40,6 +40,9 @@ module rom(
 			if (rom_we_i == 1'b0)
 			begin
 				rom_data_o <= romSet[rom_addr_i[11:2]];
+				rom_ready_o <= 1'b1;
+			end else
+			begin
 				rom_ready_o <= 1'b1;
 			end
 		end

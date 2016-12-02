@@ -59,8 +59,8 @@ module ctrl(
 			flush <= 1'b0;
 			// RESET exception
 			`ifdef InUcore
-				//new_pc <= 32'hBFC00000;
-				new_pc <= 32'h80000000;
+				new_pc <= 32'hBFC00000;
+				//new_pc <= 32'h80000000;
 			`endif
 			`ifdef NotInUcore
 				new_pc <= `ZeroWord;
