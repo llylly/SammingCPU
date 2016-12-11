@@ -313,107 +313,121 @@ module mmu(
 					if (addr_i[31:30] == 2'b10)
 					begin
 						res_addr_i <= {{3{1'b0}}, addr_i[28:0]};
-						cnt <= 3'b010;
+						cnt <= 3'b110;
 						tlb_err_o <= 1'b0;
 						mod_o <= 1'b0;
 					end else
 					begin
-						match = 5'b00000;
 						if ((addr_i[31:13] == itemSet[0][`ItemVPN2]) && 
 							((itemSet[0][`ItemG] == 1'b1) || (itemSet[0][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[0][`ItemTop] == 1'b1)) begin
 							match = 5'b10000;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[1][`ItemVPN2]) && 
 							((itemSet[1][`ItemG] == 1'b1) || (itemSet[1][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[1][`ItemTop] == 1'b1)) begin
 							match = 5'b10001;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[2][`ItemVPN2]) && 
 							((itemSet[2][`ItemG] == 1'b1) || (itemSet[2][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[2][`ItemTop] == 1'b1)) begin
 							match = 5'b10010;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[3][`ItemVPN2]) && 
 							((itemSet[3][`ItemG] == 1'b1) || (itemSet[3][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[3][`ItemTop] == 1'b1)) begin
 							match = 5'b10011;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[4][`ItemVPN2]) && 
 							((itemSet[4][`ItemG] == 1'b1) || (itemSet[4][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[4][`ItemTop] == 1'b1)) begin
 							match = 5'b10100;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[5][`ItemVPN2]) && 
 							((itemSet[5][`ItemG] == 1'b1) || (itemSet[5][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[5][`ItemTop] == 1'b1)) begin
 							match = 5'b10101;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[6][`ItemVPN2]) && 
 							((itemSet[6][`ItemG] == 1'b1) || (itemSet[6][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[6][`ItemTop] == 1'b1)) begin
 							match = 5'b10110;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[7][`ItemVPN2]) && 
 							((itemSet[7][`ItemG] == 1'b1) || (itemSet[7][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[7][`ItemTop] == 1'b1)) begin
 							match = 5'b10111;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[8][`ItemVPN2]) && 
 							((itemSet[8][`ItemG] == 1'b1) || (itemSet[8][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[8][`ItemTop] == 1'b1)) begin
 							match = 5'b11000;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[9][`ItemVPN2]) && 
 							((itemSet[9][`ItemG] == 1'b1) || (itemSet[9][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[9][`ItemTop] == 1'b1)) begin
 							match = 5'b11001;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[10][`ItemVPN2]) && 
 							((itemSet[10][`ItemG] == 1'b1) || (itemSet[10][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[10][`ItemTop] == 1'b1)) begin
 							match = 5'b11010;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[11][`ItemVPN2]) && 
 							((itemSet[11][`ItemG] == 1'b1) || (itemSet[11][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[11][`ItemTop] == 1'b1)) begin
 							match = 5'b11011;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[12][`ItemVPN2]) && 
 							((itemSet[12][`ItemG] == 1'b1) || (itemSet[12][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[12][`ItemTop] == 1'b1)) begin
 							match = 5'b11100;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[13][`ItemVPN2]) && 
 							((itemSet[13][`ItemG] == 1'b1) || (itemSet[13][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[13][`ItemTop] == 1'b1)) begin
 							match = 5'b11101;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[14][`ItemVPN2]) && 
 							((itemSet[14][`ItemG] == 1'b1) || (itemSet[14][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[14][`ItemTop] == 1'b1)) begin
 							match = 5'b11110;
-						end
+						end else
 						if ((addr_i[31:13] == itemSet[15][`ItemVPN2]) && 
 							((itemSet[15][`ItemG] == 1'b1) || (itemSet[15][`ItemASID] == entryhi_i[7:0])) &&
 							(itemSet[15][`ItemTop] == 1'b1)) begin
 							match = 5'b11111;
-						end
-						if (match[4] == 1'b0)
+						end else
+							match = 5'b00000;
+						cnt <= 3'b001;
+						
+					end
+				end
+				
+				3'b001: begin
+					cnt <= 3'b010;
+				end
+				
+				3'b010: begin
+					cnt <= 3'b011;
+				end
+				
+				3'b011: begin
+					if (match[4] == 1'b0)
 						begin
 							tlb_err_o <= 1'b1;
 							ready_o <= 1'b1;
-							cnt <= 3'b100;
+							cnt <= 3'b111;
 						end else
 						begin
 							tlb_err_o <= 1'b0;
-							cnt <= 3'b010;
+							cnt <= 3'b100;
 							if (((addr_i[12] == 1'b0) && (itemSet[match[3:0]][`ItemV0] == 1'b0)) ||
 								((addr_i[12] == 1'b1) && (itemSet[match[3:0]][`ItemV1] == 1'b0)))
 							begin
 								tlb_err_o <= 1'b1;
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 							end
 							if (we_i == `RAMWrite_OP)
 							begin
@@ -422,7 +436,7 @@ module mmu(
 								begin
 									mod_o <= 1'b1;
 									ready_o <= 1'b1;
-									cnt <= 3'b100;
+									cnt <= 3'b111;
 								end
 							end
 							mmu_latest_asid_o <= itemSet[match[3:0]][`ItemASID];
@@ -435,11 +449,18 @@ module mmu(
 								res_addr_i <= {itemSet[match[3:0]][`ItemPFN1], addr_i[11:0]};
 							end
 						end
-					end
+				end
+				
+				3'b100: begin
+					cnt <= 3'b101;
+				end
+				
+				3'b101: begin
+					cnt <= 3'b110;
 				end
 				
 				// read/write and wait
-				3'b010: begin
+				3'b110: begin
 					/* debug */
 					//tlb_err_o <= 1'b0;
 					//mod_o <= 1'b0;
@@ -457,7 +478,7 @@ module mmu(
 							if (ram_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 							end
 						end else
 						if (res_addr_i[31:12] == 20'h1FC00)
@@ -469,7 +490,7 @@ module mmu(
 							if (rom_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 							end
 						end else
 						if ((res_addr_i == 32'h1FD003F8) || (res_addr_i == 32'h1FD003FC))
@@ -483,7 +504,7 @@ module mmu(
 							if (serail_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 							end
 						end else
 						if (res_addr_i[31:24] == 8'h1E)
@@ -497,12 +518,12 @@ module mmu(
 							if (flash_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 							end
 						end else
 						begin
 							ready_o <= 1'b1;
-							cnt <= 3'b100;
+							cnt <= 3'b111;
 						end
 					end
 					if (we_i == `RAMRead_OP)
@@ -517,7 +538,7 @@ module mmu(
 							if (ram_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 								data_o <= ram_data_i;
 							end
 						end else
@@ -530,7 +551,7 @@ module mmu(
 							if (rom_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 								data_o <= rom_data_i;
 							end
 						end else
@@ -544,7 +565,7 @@ module mmu(
 							if (serail_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 								data_o <= serail_data_i;
 							end
 						end else
@@ -558,20 +579,20 @@ module mmu(
 							if (flash_ready_i == 1'b1)
 							begin
 								ready_o <= 1'b1;
-								cnt <= 3'b100;
+								cnt <= 3'b111;
 								data_o <= {{16{1'b0}}, flash_data_i};
 							end
 						end else
 						begin
 							ready_o <= 1'b1;
-							cnt <= 3'b100;
+							cnt <= 3'b111;
 							data_o <= `ZeroWord;
 						end
 					end
 				end
 				
 				// restore and finish
-				3'b100: begin
+				3'b111: begin
 					ram_we_o <= `RAMRead_OP;
 					ram_ce_o <= 1'b0;
 

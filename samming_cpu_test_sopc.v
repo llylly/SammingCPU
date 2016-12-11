@@ -21,9 +21,9 @@ module samming_cpu_test_sopc(
 	
 	`ifdef REALITY
 	// serial
-	output wire rxd,
+	output wire					rxd,
 		// receive
-	input wire txd,
+	input wire					txd,
 		// send
 	
 	// from SRAM
@@ -53,17 +53,27 @@ module samming_cpu_test_sopc(
 	input wire					flash_sys_i,
 	output wire					flash_vpen_o,
 	output wire					flash_we_o,
+	
+	input wire					ps2_clk_i,
+	input wire					ps2_data_i,
 	`endif
 
-	output wire[`RegBus]		debug
-		// used only for testing
+	// nixie
+	output wire[0:6]			show1_o,
+	output wire[0:6]			show0_o,
+	
+	// VGA
+	output wire[8:0]			vga_color_o,
+	output wire					vga_vhync_o,
+	output wire					vga_hhync_o
 
 );
 
 	/** slow frequency as cpu clock **/
+	wire clk50M, clk65M, clk325M;
 	reg clk_1 = 1'b0, clk_2 = 1'b0, clk_3 = 1'b0, clk_4 = 1'b0, clk_5 = 1'b0;
 	
-	always @(posedge clk)
+	always @(posedge clk50M)
 	begin
 		clk_1 <= ~clk_1;
 	end
@@ -88,6 +98,24 @@ module samming_cpu_test_sopc(
 		clk_5 <= ~clk_5;
 	end
 	
+	// PLL
+	`ifdef REALITY
+	pll pll0(
+		.CLK_IN1(clk),
+		.CLK_OUT1(clk50M),
+		.CLK_OUT2(clk65M),
+		.CLK_OUT3(clk325M),
+		.RESET(1'b0)
+	);
+	`endif
+	`ifdef SIMULATE
+		assign CLK50M = clk;
+		assign CLK65M = clk;
+	`endif
+	
+	// Nixie debug
+	wire[7:0] nixie_o;
+	
 	// SRAM simulator
 	`ifdef SIMULATE
 	wire[`RAMBus] base_ram_data;
@@ -102,7 +130,7 @@ module samming_cpu_test_sopc(
 	wire ext_ram_we;
 	
 	test_ram test_ram0(
-		.clk(clk),
+		.clk(clk50M),
 		.base_ram_addr(base_ram_addr), .base_ram_ce(base_ram_ce),
 		.base_ram_oe(base_ram_oe), .base_ram_we(base_ram_we),
 		.ext_ram_addr(ext_ram_addr), .ext_ram_ce(ext_ram_ce),
@@ -121,7 +149,7 @@ module samming_cpu_test_sopc(
 	wire[3:0] sram_sel_o;
 	
 	ram ram0(
-		.rst(rst), .clk(clk),
+		.rst(rst), .clk(clk50M),
 		
 		.we_i(sram_we_o), .ce_i(sram_ce_o),
 		.addr_i(sram_addr_o), .data_i(sram_data_o), .sel_i(sram_sel_o),
@@ -143,7 +171,7 @@ module samming_cpu_test_sopc(
 	wire rom_ce_o;
 	
 	rom rom0(
-		.clk(clk), .rst(rst),
+		.clk(clk50M), .rst(rst),
 		.rom_data_o(rom_data_i), .rom_ready_o(rom_ready_i),
 		.rom_addr_i(rom_addr_o), .rom_we_i(rom_we_o), .rom_ce_i(rom_ce_o)
 	);
@@ -159,7 +187,7 @@ module samming_cpu_test_sopc(
 	
 	`ifdef SIMULATE
 	test_flash test_flash0(
-		.clk(clk), .rst(rst),
+		.clk(clk50M), .rst(rst),
 		.flash_data_o(flashi_data_i), .flash_ready_o(flashi_ready_i),
 		.flash_addr_i(flashi_addr_o), .flash_ce_i(flashi_ce_o), .flash_we_i(flashi_we_o), .flash_data_i(flashi_data_o)
 	);
@@ -167,7 +195,7 @@ module samming_cpu_test_sopc(
 	
 	`ifdef REALITY
 	flash flash0(
-		.clk(clk), .rst(rst),
+		.clk(clk50M), .rst(rst),
 		
 		.data_o(flashi_data_i), .ready_o(flashi_ready_i),
 		.addr_i(flashi_addr_o), .ce_i(flashi_ce_o), .we_i(flashi_we_o), .data_i(flashi_data_o), .sel_i(flashi_sel_o),
@@ -188,28 +216,73 @@ module samming_cpu_test_sopc(
 	wire serail_ce_o;
 	wire[3:0] serail_sel_o;
 	wire readEnable;
+	wire writeBusy;
+	wire[7:0] current_o;
 	
 	`ifdef SIMULATE
 	test_serail test_serail0(
-		.clk(clk), .rst(rst),
+		.clk(clk50M), .rst(rst),
 		.serail_data_o(serail_data_i), .serail_ready_o(serail_ready_i),
 		.serail_addr_i(serail_addr_o), .serail_data_i(serail_data_o),
 		.serail_we_i(serail_we_o), .serail_ce_i(serail_ce_o)
 	);
+	assign readEnable = 1'b0;
+	assign writeBusy = 1'b0;
+	assign current_o = 8'h00;
 	`endif
 	
 	`ifdef REALITY
 	serail serail0(
-		.clk(clk), .rst(rst),
+		.clk(clk50M), .rst(rst),
 		.rxd(rxd), .txd(txd),
 		
 		.data_o(serail_data_i), .ready_o(serail_ready_i),
 		.addr_i(serail_addr_o), .data_i(serail_data_o),
 		.we_i(serail_we_o), .ce_i(serail_ce_o), .sel_i(serail_sel_o),
 		
-		.readEnable(readEnable)
+		.readEnable(readEnable), .writeBusy(writeBusy), .current_o(current_o),
+		
+		.ps2_clk_i(ps2_clk_i), .ps2_data_i(ps2_data_i)
 	);
 	`endif
+	
+	// vga display
+	`ifdef REALITY
+	vga vga0(
+		.clk(clk65M), .rst(rst),
+		.current_i(current_o), .writeBusy_i(writeBusy),
+		.vga_color_o(vga_color_o), .vga_vhync_o(vga_vhync_o), .vga_hhync_o(vga_hhync_o),
+		.debug(nixie_o)
+	);
+	`endif
+	
+	// nixie counter
+	`ifdef REALITY
+	reg[26:0] miclock = 26'h0;
+	reg[7:0] mi = 8'h00;
+	
+	always @(posedge clk50M)
+	begin
+		if (miclock == 26'd50000000)
+		begin
+			miclock <= 26'd1;
+			mi <= mi + 1;
+		end else
+			miclock <= miclock + 1;
+	end
+	
+	nixie nixie0(
+		.rst(rst), .data_i(mi), .show1_o(show1_o), .show0_o(show0_o)
+	);
+	`endif
+	
+	/*
+	`ifdef REALITY
+	nixie nixie0(
+		.rst(rst), .data_i(nixie_o), .show1_o(show1_o), .show0_o(show0_o)
+	);
+	`endif
+	*/
 		
 	wire[5:0] int_i;
 	wire timer_int;
@@ -220,9 +293,9 @@ module samming_cpu_test_sopc(
 	//			[4] - com1
 	assign int_i = {timer_int, 1'b0, 1'b0, readEnable, 1'b0, 1'b0};
 		// construct outer interrupt vector
-	
+
 	samming_cpu samming_cpu0(
-		.clk(clk_4), .busclk(clk), .rst(rst),
+		.clk(clk_4), .busclk(clk50M), .rst(rst),
 		.int_i(int_i), .timer_int_o(timer_int),
 		// sram
 		.sram_ready_i(sram_ready_i), .sram_data_i(sram_data_i),
@@ -241,9 +314,7 @@ module samming_cpu_test_sopc(
 		// Serail
 		.serail_data_i(serail_data_i), .serail_ready_i(serail_ready_i),
 		.serail_addr_o(serail_addr_o), .serail_data_o(serail_data_o),
-		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o), .serail_sel_o(serail_sel_o),
-		
-		.debug(debug)
+		.serail_we_o(serail_we_o), .serail_ce_o(serail_ce_o), .serail_sel_o(serail_sel_o)
 	);
 
 endmodule

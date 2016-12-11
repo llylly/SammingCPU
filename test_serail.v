@@ -23,8 +23,8 @@ module test_serail(
 	// input
 	input wire[`SerailAddrBus]	serail_addr_i,
 	input wire[`RAMBus]			serail_data_i,
-	input wire[`RAMBus]			serail_we_i,
-	input wire[`RAMBus]			serail_ce_i
+	input wire					serail_we_i,
+	input wire					serail_ce_i
 );
 
 	reg[1:0] cnt;
@@ -48,6 +48,8 @@ module test_serail(
 			end else
 			begin
 				cnt <= 2'b00;
+				serail_data_o <= 32'h1;
+				serail_ready_o <= 1'b1;
 			end
 		end
 	end

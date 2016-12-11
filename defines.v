@@ -271,8 +271,8 @@
 `define FlashRealBus	15:0
 `define FlashAddrBus	22:0
 `define SerailAddrBus	2:0
-`define DataMemNum		524288
-`define DataWidth		18:0
+`define DataMemNum		1048576
+`define DataWidth		19:0
 `define ROMNum			1024
 `define FlashNum		131072
 `define FlashSimuBus	18:2

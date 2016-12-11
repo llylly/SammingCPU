@@ -70,24 +70,16 @@ module ram(
 			cnt <= 3'b000;
 			data_ready <= 1'b0;
 			data_o <= `ZeroWord;
-			base_ram_ce <= 1'b1;
+			base_ram_ce <= 1'b0;
 			base_ram_we <= 1'b1;
 			base_ram_oe <= 1'b0;
 			base_ram_data_buf <= 32'hZZZZZZZZ;
-			ext_ram_ce <= 1'b1;
+			ext_ram_ce <= 1'b0;
 			ext_ram_we <= 1'b1;
 			ext_ram_oe <= 1'b0;
 			ext_ram_data_buf <= 32'hZZZZZZZZ;
 		end else
 		begin
-			base_ram_ce <= 1'b1;
-			base_ram_we <= 1'b1;
-			base_ram_oe <= 1'b0;
-			base_ram_data_buf <= 32'hZZZZZZZZ;
-			ext_ram_ce <= 1'b1;
-			ext_ram_we <= 1'b1;
-			ext_ram_oe <= 1'b0;
-			ext_ram_data_buf <= 32'hZZZZZZZZ;
 			if (we_i == `RAMWrite_OP)
 			begin
 				if (sel_i == 4'b1111)
@@ -149,7 +141,7 @@ module ram(
 							begin
 								if (addr_i[22] == 1'b0)
 									store_buf[31:24] <= base_ram_data[31:24];
-								else
+								else if (addr_i[22] == 1'b1)
 									store_buf[31:24] <= ext_ram_data[31:24];
 							end
 							if (sel_i[2] == 1'b1)
@@ -159,7 +151,7 @@ module ram(
 							begin
 								if (addr_i[22] == 1'b0)
 									store_buf[23:16] <= base_ram_data[23:16];
-								else
+								else if (addr_i[22] == 1'b1)
 									store_buf[23:16] <= ext_ram_data[23:16];
 							end
 							if (sel_i[1] == 1'b1)
@@ -169,7 +161,7 @@ module ram(
 							begin
 								if (addr_i[22] == 1'b0)
 									store_buf[15:8] <= base_ram_data[15:8];
-								else
+								else if (addr_i[22] == 1'b1)
 									store_buf[15:8] <= ext_ram_data[15:8];
 							end
 							if (sel_i[0] == 1'b1)
@@ -179,7 +171,7 @@ module ram(
 							begin
 								if (addr_i[22] == 1'b0)
 									store_buf[7:0] <= base_ram_data[7:0];
-								else
+								else if (addr_i[22] == 1'b1)
 									store_buf[7:0] <= ext_ram_data[7:0];
 							end
 							cnt <= 3'b010;
@@ -202,7 +194,7 @@ module ram(
 									ext_ram_ce <= 1'b0;
 									ext_ram_we <= 1'b0;
 									ext_ram_oe <= 1'b1;
-									ext_ram_data_buf <= data_i;
+									ext_ram_data_buf <= store_buf;
 								end
 								cnt <= cnt + 1;
 							end else
@@ -238,21 +230,19 @@ module ram(
 					cnt <= 3'b001;
 				end else
 				begin
-					if (cnt != 3'b011)
+					if (cnt == 3'b010)
 					begin
-						cnt <= cnt + 1;
-					end else
-					begin
+						if (addr_i[22] == 1'b0)
+						begin
+							data_o <= base_ram_data;
+						end else
+						if (addr_i[22] == 1'b1)
+						begin
+							data_o <= ext_ram_data;
+						end
 						data_ready <= 1'b1;
-					end
-					if (addr_i[22] == 1'b0)
-					begin
-						data_o <= base_ram_data;
 					end else
-					if (addr_i[22] == 1'b1)
-					begin
-						data_o <= ext_ram_data;
-					end
+						cnt <= cnt + 1;
 				end
 			end
 		end

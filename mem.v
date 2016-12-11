@@ -837,8 +837,8 @@ module mem(
 			debug <= `ZeroWord;
 		end else
 		begin
-			if (excepttype != `ZeroWord)
-				debug <= debug | excepttype;
+			if (excepttype_o != `ZeroWord)
+				debug <= excepttype_o;
 		end
 	end
 	
@@ -940,7 +940,7 @@ module mem(
 	end
 	
 	/* forbid mem_ce signal once exception occurred to prevent data writing to RAM */
-	assign mem_ce_o = mem_ce & (~(|excepttype_o));
+	assign mem_ce_o = mem_ce & (~(|excepttype_i));
 	//assign mem_ce_o = mem_ce;
 
 endmodule
